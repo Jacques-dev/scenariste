@@ -11,6 +11,28 @@ import { RulesPanel } from './components/RulesPanel'
 type Mode = 'edit' | 'preview' | 'rules'
 const STORAGE_KEY = 'scenariste-doc'
 
+// Les premières versions pré-remplissaient l'éditeur avec un scénario d'exemple,
+// que la sauvegarde automatique a pu enregistrer chez les visiteurs : on le purge.
+const OLD_SAMPLE_SIGNATURE = [
+  'Titre: LA DERNIÈRE SÉANCE',
+  'INT. CINÉMA LE ROYAL - SALLE DE PROJECTION - NUIT',
+  'adresse@exemple.fr',
+]
+
+function initialDoc(): string {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved == null) return ''
+    if (OLD_SAMPLE_SIGNATURE.every(s => saved.includes(s))) {
+      localStorage.removeItem(STORAGE_KEY)
+      return ''
+    }
+    return saved
+  } catch {
+    return ''
+  }
+}
+
 function download(filename: string, text: string) {
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
   const a = document.createElement('a')
@@ -21,9 +43,7 @@ function download(filename: string, text: string) {
 }
 
 export default function App() {
-  const [doc, setDoc] = useState<string>(() => {
-    try { return localStorage.getItem(STORAGE_KEY) ?? '' } catch { return '' }
-  })
+  const [doc, setDoc] = useState<string>(initialDoc)
   const [cursorLine, setCursorLine] = useState(0)
   const [mode, setMode] = useState<Mode>('edit')
   const [showLint, setShowLint] = useState(true)

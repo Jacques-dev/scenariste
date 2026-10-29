@@ -27,6 +27,8 @@ body {
 .actions button:disabled { opacity: .5; cursor: default; }
 button.accent { background: #4568a8 !important; border-color: #4568a8 !important; color: #fff !important; }
 button.accent:hover { background: #527ac2 !important; }
+.save-btn { min-width: 100px; transition: background .2s ease, border-color .2s ease; }
+button.save-btn.saved { background: #2e9e4f !important; border-color: #2e9e4f !important; }
 
 /* ---------- boîtes de dialogue (compte, mes scénarios) ---------- */
 .overlay {

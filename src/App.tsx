@@ -106,6 +106,8 @@ export default function App() {
   const session = useSession()
   const [showList, setShowList] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [savedFlash, setSavedFlash] = useState(false)
+  const savedFlashTimer = useRef<number | undefined>(undefined)
   const [currentId, setCurrentId] = useState<string | null>(null)
   const lastSavedRef = useRef<string>('')
 
@@ -174,7 +176,10 @@ export default function App() {
       const id = await saveScenario(currentId, content)
       setCurrentId(id)
       lastSavedRef.current = content
-      setNotice('Scénario enregistré dans votre espace.')
+      // Confirmation visuelle sur le bouton lui-même : vert + check 3 s.
+      setSavedFlash(true)
+      window.clearTimeout(savedFlashTimer.current)
+      savedFlashTimer.current = window.setTimeout(() => setSavedFlash(false), 3000)
     } catch (e) {
       setNotice(`Échec de l'enregistrement : ${e instanceof Error ? e.message : e}`)
     } finally {
@@ -329,8 +334,13 @@ export default function App() {
           )}
           {supabase && session && (
             <>
-              <button className="accent" onClick={onSave} disabled={saving}>
-                {saving ? 'Enregistrement…' : 'Enregistrer'}
+              <button
+                className={`accent save-btn${savedFlash ? ' saved' : ''}`}
+                onClick={onSave}
+                disabled={saving}
+                title="Enregistrer dans votre espace (Ctrl+S)"
+              >
+                {savedFlash ? '✓' : saving ? 'Enregistrement…' : 'Enregistrer'}
               </button>
               <button onClick={() => setShowList(true)}>Mes scénarios</button>
               <button title={session.user.email ?? ''} onClick={onLogout}>Déconnexion</button>

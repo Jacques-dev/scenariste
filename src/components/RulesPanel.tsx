@@ -69,9 +69,11 @@ export function RulesPanel() {
         l'aperçu et l'export.
       </p>
       <p>
-        <strong>Le site ne conserve rien</strong> : chaque visite repart d'un document
-        vierge. Exportez votre travail (<code>.fountain</code> de préférence) avant de
-        quitter la page — une alerte vous prévient si vous partez sans l'avoir fait.
+        <strong>Le site ne conserve rien localement</strong> : chaque visite repart d'un
+        document vierge. Connectez-vous avec Google pour enregistrer vos scénarios dans
+        votre espace (bouton « Enregistrer » ou Ctrl+S) et les retrouver via
+        « Mes scénarios » — ou exportez en <code>.fountain</code>. Une alerte vous
+        prévient si vous quittez la page avec un travail non enregistré.
       </p>
 
       <h3>Pagination automatique</h3>

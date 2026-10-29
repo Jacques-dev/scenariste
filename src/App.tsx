@@ -7,6 +7,8 @@ import { ELEMENTS, ElType } from './rules/spec'
 import { Preview } from './components/Preview'
 import { LintPanel } from './components/LintPanel'
 import { RulesPanel } from './components/RulesPanel'
+import { ScenariosDialog, useSession } from './components/Cloud'
+import { supabase, saveScenario, signInWithGoogle, ScenarioRow } from './supabase'
 
 type Mode = 'edit' | 'preview' | 'rules'
 
@@ -32,6 +34,13 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // Stockage cloud (Supabase) — inactif tant que src/config.ts est vide.
+  const session = useSession()
+  const [showList, setShowList] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [currentId, setCurrentId] = useState<string | null>(null)
+  const lastSavedRef = useRef<string>('')
+
   const editorHost = useRef<HTMLDivElement>(null)
   const editor = useRef<EditorHandle | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -50,7 +59,8 @@ export default function App() {
   // On prévient donc avant de quitter si un travail en cours serait perdu.
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => {
-      if (docRef.current.trim() !== NEW_DOC.trim()) {
+      const d = docRef.current
+      if (d.trim() !== NEW_DOC.trim() && d !== lastSavedRef.current) {
         e.preventDefault()
         e.returnValue = ''
       }
@@ -83,7 +93,58 @@ export default function App() {
   const onNew = () => {
     if (doc.trim() && !window.confirm('Remplacer le document actuel par un document vide ?')) return
     setText(NEW_DOC)
+    setCurrentId(null)
+    lastSavedRef.current = ''
   }
+
+  const onSave = async () => {
+    if (!session || saving) return
+    setSaving(true)
+    try {
+      const content = docRef.current
+      const id = await saveScenario(currentId, content)
+      setCurrentId(id)
+      lastSavedRef.current = content
+      setNotice('Scénario enregistré dans votre espace.')
+    } catch (e) {
+      setNotice(`Échec de l'enregistrement : ${e instanceof Error ? e.message : e}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const onOpenScenario = (row: ScenarioRow) => {
+    const d = docRef.current
+    if (d.trim() !== NEW_DOC.trim() && d !== lastSavedRef.current &&
+        !window.confirm('Le document en cours n\'est pas enregistré. L\'écraser ?')) return
+    setText(row.content)
+    setCurrentId(row.id)
+    lastSavedRef.current = row.content
+    setShowList(false)
+    setMode('edit')
+  }
+
+  const onLogin = () => {
+    signInWithGoogle().catch(e => setNotice(`Connexion impossible : ${e.message}`))
+  }
+
+  const onLogout = async () => {
+    await supabase?.auth.signOut()
+    setCurrentId(null)
+    lastSavedRef.current = ''
+  }
+
+  // Ctrl+S : enregistrer quand on est connecté.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        void onSave()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   const onImport = async (file: File) => {
     setBusy(true)
@@ -101,6 +162,8 @@ export default function App() {
         return
       }
       setText(text)
+      setCurrentId(null)
+      lastSavedRef.current = ''
       setMode('edit')
       setNotice(`« ${file.name} » importé et reformaté. Vérifiez les remarques du panneau de droite.`)
     } catch (e) {
@@ -139,6 +202,18 @@ export default function App() {
           <button onClick={exportPdf}>Exporter PDF</button>
           <button onClick={() => download(`${baseName()}.fountain`, doc)}>.fountain</button>
           <button onClick={() => download(`${baseName()}.txt`, doc)}>.txt</button>
+          {supabase && !session && (
+            <button className="accent" onClick={onLogin}>Se connecter avec Google</button>
+          )}
+          {supabase && session && (
+            <>
+              <button className="accent" onClick={onSave} disabled={saving}>
+                {saving ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+              <button onClick={() => setShowList(true)}>Mes scénarios</button>
+              <button title={session.user.email ?? ''} onClick={onLogout}>Déconnexion</button>
+            </>
+          )}
         </div>
         <input
           ref={fileInput} type="file" accept=".pdf,.txt,.fountain,.md" hidden
@@ -148,6 +223,9 @@ export default function App() {
 
       {notice && (
         <div className="notice" onClick={() => setNotice(null)}>{notice} ✕</div>
+      )}
+      {showList && (
+        <ScenariosDialog currentId={currentId} onOpen={onOpenScenario} onClose={() => setShowList(false)} />
       )}
 
       <main className={`main mode-${mode}`}>

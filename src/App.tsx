@@ -19,17 +19,20 @@ const OLD_SAMPLE_SIGNATURE = [
   'adresse@exemple.fr',
 ]
 
+// Document de départ : le squelette de la page de titre, à compléter.
+const NEW_DOC = 'Titre: \nÉcrit par: \nContact: \n\n'
+
 function initialDoc(): string {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved == null) return ''
+    if (saved == null || saved.trim() === '') return NEW_DOC
     if (OLD_SAMPLE_SIGNATURE.every(s => saved.includes(s))) {
       localStorage.removeItem(STORAGE_KEY)
-      return ''
+      return NEW_DOC
     }
     return saved
   } catch {
-    return ''
+    return NEW_DOC
   }
 }
 
@@ -95,7 +98,7 @@ export default function App() {
 
   const onNew = () => {
     if (doc.trim() && !window.confirm('Remplacer le document actuel par un document vide ?')) return
-    setText('Titre: \nÉcrit par: \n\n')
+    setText(NEW_DOC)
   }
 
   const onImport = async (file: File) => {

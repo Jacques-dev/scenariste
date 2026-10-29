@@ -43,10 +43,17 @@ export function createEditor(
   initial: string,
   onChange: (doc: string, cursorLine: number) => void,
 ): EditorHandle {
+  // Sur le squelette de page de titre, place le curseur juste après « Titre: ».
+  const firstLineEnd = initial.indexOf('\n')
+  const startSelection = initial.startsWith('Titre:') && firstLineEnd > 0
+    ? { anchor: firstLineEnd }
+    : undefined
+
   const view = new EditorView({
     parent,
     state: EditorState.create({
       doc: initial,
+      selection: startSelection,
       extensions: [
         history(),
         drawSelection(),

@@ -79,8 +79,10 @@ export default function App() {
   const [doc, setDoc] = useState<string>(NEW_DOC)
   const [cursorLine, setCursorLine] = useState(0)
   const [mode, setMode] = useState<Mode>('edit')
-  const [showLint, setShowLint] = useState(true)
-  const [showScenes, setShowScenes] = useState(true)
+  // Sur petit écran, les panneaux latéraux démarrent fermés (rouvrables depuis
+  // la barre d'état) et s'affichent par-dessus la page plutôt qu'à côté.
+  const [showLint, setShowLint] = useState(() => !window.matchMedia('(max-width: 1100px)').matches)
+  const [showScenes, setShowScenes] = useState(() => !window.matchMedia('(max-width: 1100px)').matches)
   const [showExport, setShowExport] = useState(false)
   // Guide interactif à la première visite (simple marqueur, aucun contenu stocké).
   const [showGuide, setShowGuide] = useState<boolean>(() => {
@@ -426,9 +428,9 @@ export default function App() {
         <span className="st-el">{currentType ? ELEMENTS[currentType].label : '—'}</span>
         <span className="st-hint">{HINTS[currentType ?? 'empty'] ?? ''}</span>
         <span>{pageCount} page{pageCount > 1 ? 's' : ''} (≈ {pageCount} min)</span>
-        <span>{st.scenes} séquence{st.scenes > 1 ? 's' : ''}</span>
-        <span>{st.words} mots</span>
-        <span>{st.characters.length} personnage{st.characters.length > 1 ? 's' : ''}</span>
+        <span className="st-stat">{st.scenes} séquence{st.scenes > 1 ? 's' : ''}</span>
+        <span className="st-stat">{st.words} mots</span>
+        <span className="st-stat">{st.characters.length} personnage{st.characters.length > 1 ? 's' : ''}</span>
         <button className="st-lint" onClick={() => { setMode('edit'); setShowLint(v => !v) }}>
           {issues.length === 0 ? '✓ conforme' : `${issues.length} remarque${issues.length > 1 ? 's' : ''}`}
         </button>

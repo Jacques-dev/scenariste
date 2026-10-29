@@ -303,6 +303,38 @@ button.ghost { background: none !important; }
 }
 .rules-panel th { background: #2a2f37; }
 
+/* ---------- petits écrans ----------
+   Sous 1100px les trois colonnes ne tiennent plus : les panneaux latéraux
+   passent par-dessus la page (ouverts à la demande depuis la barre d'état). */
+@media (max-width: 1100px) {
+  .editor-wrap { position: relative; }
+  .scenenav, .side { position: absolute; top: 0; bottom: 0; z-index: 30; }
+  .scenenav { left: 0; width: min(280px, 85vw); box-shadow: 6px 0 24px rgba(0, 0, 0, .45); }
+  .side { right: 0; width: min(330px, 85vw); box-shadow: -6px 0 24px rgba(0, 0, 0, .45); }
+}
+@media (max-width: 900px) {
+  .topbar { gap: 8px; padding: 6px 10px; }
+  .statusbar { flex-wrap: wrap; gap: 4px 14px; }
+  .st-el { min-width: 0; }
+  .page { zoom: .7; }
+}
+@media (max-width: 700px) {
+  .tabs button, .actions button { padding: 4px 9px; font-size: 12px; }
+  .st-hint, .st-stat { display: none; }
+  .editor-page { padding: 14px 8px; }
+  .cm-content { padding: 24px 12px !important; }
+  /* Retraits réduits : la hiérarchie des éléments reste lisible sans écraser
+     la largeur de ligne ; l'aperçu paginé conserve les vraies mesures. */
+  .el-character { padding-left: 12ch !important; }
+  .el-parenthetical { padding-left: 8ch !important; padding-right: 4ch !important; }
+  .el-dialogue { padding-left: 5ch !important; padding-right: 3ch !important; }
+  .rules-panel { padding: 20px 12px 40px; }
+}
+@media (max-width: 500px) {
+  .editor-host { font-size: 13.5px; }
+  .page { zoom: .42; }
+}
+
 /* ---------- impression / export PDF ---------- */
 @media print {
   body { background: #fff; }
@@ -310,7 +342,7 @@ button.ghost { background: none !important; }
   .main { overflow: visible; }
   .pages { padding: 0; }
   .page {
-    box-shadow: none; margin: 0; border: none;
+    box-shadow: none; margin: 0; border: none; zoom: 1;
     page-break-after: always; break-after: page;
   }
   @page { size: letter; margin: 0; }

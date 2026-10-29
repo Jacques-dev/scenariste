@@ -67,12 +67,14 @@ export function Guide({ onClose }: { onClose: () => void }) {
   const last = i >= STEPS.length - 1
 
   // Bulle sous la cible, sinon au-dessus, sinon par-dessus (cible plein écran).
+  // La bulle est plus haute sur écran étroit (texte replié sur plus de lignes).
+  const bubbleH = window.innerWidth < 500 ? 300 : 210
   const bubbleStyle: React.CSSProperties = {
     left: Math.max(12, Math.min(rect.left + rect.width / 2 - 170, window.innerWidth - 352)),
   }
-  if (rect.bottom + 210 < window.innerHeight) bubbleStyle.top = rect.bottom + 12
-  else if (rect.top - 210 > 0) bubbleStyle.bottom = window.innerHeight - rect.top + 12
-  else bubbleStyle.top = Math.max(12, Math.min(rect.top + 48, window.innerHeight - 230))
+  if (rect.bottom + bubbleH < window.innerHeight) bubbleStyle.top = rect.bottom + 12
+  else if (rect.top - bubbleH > 0) bubbleStyle.bottom = window.innerHeight - rect.top + 12
+  else bubbleStyle.top = Math.max(12, Math.min(rect.top + 48, window.innerHeight - bubbleH - 20))
 
   return (
     <div className="guide">

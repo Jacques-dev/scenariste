@@ -35,10 +35,7 @@ export function LintPanel({
         >
           <span className="lint-line">l. {it.lineNo + 1}</span>
           <span className="lint-sev">{it.severity === 'warn' ? '⚠' : 'ℹ'}</span>
-          <span className="lint-body">
-            <span className="lint-msg">{it.message}</span>
-            {it.fix && <span className="lint-fixhint">⚡ {it.fix.label}</span>}
-          </span>
+          <span className="lint-msg">{it.message}</span>
         </button>
       ))}
     </div>

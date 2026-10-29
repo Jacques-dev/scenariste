@@ -134,15 +134,14 @@ button.ghost { background: none !important; }
 .lint-item {
   display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left;
   background: none; border: none; border-radius: 6px; padding: 7px 8px;
-  color: #d6d6d6; font-size: 12.5px; cursor: pointer; line-height: 1.35;
+  color: #d6d6d6; font-size: 12.5px; cursor: default; line-height: 1.35;
 }
-.lint-item:hover { background: #2a3038; }
+/* Seules les remarques corrigeables réagissent au survol (en vert). */
+.lint-item.fixable { cursor: pointer; }
 .lint-item.fixable:hover { background: #2d3a2e; }
 .lint-line { color: #7da7e0; min-width: 38px; font-variant-numeric: tabular-nums; }
 .sev-warn .lint-sev { color: #e8b84b; }
 .sev-info .lint-sev { color: #7da7e0; }
-.lint-body { display: flex; flex-direction: column; gap: 3px; }
-.lint-fixhint { color: #a9d8ab; font-size: 11.5px; }
 .lint-fixall {
   display: block; width: 100%; margin: 4px 0 8px; padding: 7px 10px;
   background: #2d3a2e; color: #a9d8ab; border: 1px solid #3e5340;

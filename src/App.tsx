@@ -13,6 +13,53 @@ import { supabase, saveScenario, signInWithGoogle, ScenarioRow } from './supabas
 
 type Mode = 'edit' | 'preview' | 'rules'
 
+/** Gabarits de la barre d'insertion : [libellé, infobulle, gabarit, sélection]. */
+const TEMPLATES: { label: string; tip: string; snippet: string; sel: [number, number] }[] = [
+  {
+    label: '+ Séquence',
+    tip: 'Nouvelle séquence : INT./EXT. LIEU - MOMENT, en majuscules — ex. INT. CUISINE - JOUR',
+    snippet: 'INT. LIEU - JOUR',
+    sel: [5, 9],
+  },
+  {
+    label: '+ Personnage',
+    tip: 'Nom du personnage en MAJUSCULES, seul sur sa ligne ; sa réplique dessous',
+    snippet: 'PERSONNAGE\nRéplique.',
+    sel: [0, 10],
+  },
+  {
+    label: '+ Didascalie',
+    tip: 'Indication de jeu entre parenthèses, en minuscules, sous le nom ou entre deux répliques — ex. (un temps)',
+    snippet: '(didascalie)',
+    sel: [1, 11],
+  },
+  {
+    label: '+ Transition',
+    tip: 'Transition en MAJUSCULES terminée par deux-points, alignée à droite — ex. FONDU AU NOIR :',
+    snippet: 'CUT TO:',
+    sel: [0, 7],
+  },
+  {
+    label: '+ Centré',
+    tip: 'Texte centré (cartons : FIN, TROIS ANS PLUS TARD…)',
+    snippet: '> TEXTE <',
+    sel: [2, 7],
+  },
+]
+
+/** Astuce affichée selon l'élément sous le curseur. */
+const HINTS: Record<string, string> = {
+  empty: 'Astuce : « INT. LIEU - JOUR » commence une séquence · un NOM EN MAJUSCULES seul lance un dialogue',
+  title: 'Ces lignes composent la page de titre (visible dans l\'aperçu paginé)',
+  scene: 'Décrivez l\'action au présent sous l\'intitulé, puis ligne vide',
+  action: 'Un NOM EN MAJUSCULES seul sur sa ligne fait parler un personnage',
+  character: 'Tapez la réplique dessous ; « (didascalie) » entre parenthèses pour le jeu',
+  parenthetical: 'Poursuivez la réplique sous la didascalie',
+  dialogue: 'Ligne vide pour terminer la réplique et revenir à l\'action',
+  transition: 'La transition s\'aligne à droite ; enchaînez avec un nouvel intitulé',
+  centered: 'Texte centré — réservé aux cartons (FIN, PLUS TARD…)',
+}
+
 // Document de départ : les mentions obligatoires de la page de titre
 // (docs/REGLES_FORMATAGE.md §4) plus la source, facultative — la laisser
 // vide ou supprimer la ligne si le scénario n'est pas une adaptation.
@@ -315,8 +362,22 @@ export default function App() {
           {showScenes && (
             <SceneNav parsed={parsed} cursorLine={cursorLine} onGo={goTo} onClose={() => setShowScenes(false)} />
           )}
-          <div className="editor-page">
-            <div ref={editorHost} className="editor-host" />
+          <div className="editor-col">
+            <div className="insertbar">
+              <span className="insertbar-label">Insérer :</span>
+              {TEMPLATES.map(t => (
+                <button
+                  key={t.label}
+                  title={t.tip}
+                  onClick={() => editor.current?.insertSnippet(t.snippet, t.sel[0], t.sel[1])}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="editor-page">
+              <div ref={editorHost} className="editor-host" />
+            </div>
           </div>
           {showLint && (
             <aside className="side">
@@ -342,6 +403,7 @@ export default function App() {
           ☰ Séquences
         </button>
         <span className="st-el">{currentType ? ELEMENTS[currentType].label : '—'}</span>
+        <span className="st-hint">{HINTS[currentType ?? 'empty'] ?? ''}</span>
         <span>{pageCount} page{pageCount > 1 ? 's' : ''} (≈ {pageCount} min)</span>
         <span>{st.scenes} séquence{st.scenes > 1 ? 's' : ''}</span>
         <span>{st.words} mots</span>

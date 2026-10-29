@@ -63,6 +63,12 @@ export interface EditorHandle {
   view: EditorView
   setText(text: string): void
   goToLine(lineNo: number): void
+  /**
+   * Insère un gabarit d'élément à la position du curseur, précédé d'une ligne
+   * vide si nécessaire, et sélectionne la partie à remplir (selStart/selEnd,
+   * offsets dans le gabarit).
+   */
+  insertSnippet(snippet: string, selStart: number, selEnd: number): void
 }
 
 export function createEditor(
@@ -117,6 +123,27 @@ export function createEditor(
     goToLine(lineNo: number) {
       const line = view.state.doc.line(Math.min(lineNo + 1, view.state.doc.lines))
       view.dispatch({ selection: { anchor: line.from }, scrollIntoView: true })
+      view.focus()
+    },
+    insertSnippet(snippet: string, selStart: number, selEnd: number) {
+      const { state } = view
+      const line = state.doc.lineAt(state.selection.main.head)
+      const lineEmpty = line.text.trim() === ''
+      const prev = line.number > 1 ? state.doc.line(line.number - 1) : null
+      const needBlank = lineEmpty ? (prev != null && prev.text.trim() !== '') : true
+      const prefix = lineEmpty ? (needBlank ? '\n' : '') : '\n\n'
+      const next = line.number < state.doc.lines ? state.doc.line(line.number + 1) : null
+      const suffix = next && next.text.trim() !== '' ? '\n' : ''
+      const from = lineEmpty ? line.from : line.to
+      const to = line.to
+      view.dispatch({
+        changes: { from, to, insert: prefix + snippet + suffix },
+        selection: {
+          anchor: from + prefix.length + selStart,
+          head: from + prefix.length + selEnd,
+        },
+        scrollIntoView: true,
+      })
       view.focus()
     },
   }

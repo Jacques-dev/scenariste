@@ -55,6 +55,8 @@ export function RulesPanel() {
         <li><code>!texte</code> — force de l'action</li>
         <li><code>&gt;TRANSITION :</code> — force une transition</li>
         <li><code>&gt;texte centré&lt;</code> — centre le texte</li>
+        <li><strong>Tab / Maj+Tab</strong> — fait tourner le type de la ligne courante
+          (auto → séquence → personnage → transition → action), comme dans Final Draft</li>
       </ul>
 
       <h3>Page de titre</h3>

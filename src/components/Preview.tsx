@@ -29,8 +29,8 @@ export function Preview({ parsed }: { parsed: ParsedLine[] }) {
             <div className="tp-title">{info.title.toLocaleUpperCase('fr-FR')}</div>
             <div className="tp-credit">{info.credit ?? 'écrit par'}</div>
             {info.author && <div className="tp-author">{info.author}</div>}
-            {info.source && <div className="tp-source">{info.source}</div>}
           </div>
+          {info.source && <div className="tp-source">Source : {info.source}</div>}
           <div className="tp-contact">
             {info.contact && <div>{info.contact}</div>}
             {info.date && <div>{info.date}</div>}

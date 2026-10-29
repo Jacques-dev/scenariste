@@ -1,11 +1,27 @@
 import {
-  EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate, keymap,
+  EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate, WidgetType, keymap,
   drawSelection, highlightActiveLine, placeholder, lineNumbers, highlightActiveLineGutter,
 } from '@codemirror/view'
 import { EditorState, RangeSetBuilder } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { parseScript } from './parser'
 import { ElType } from './rules/spec'
+
+/** Texte fantôme affiché après une clé de bloc titre laissée vide. */
+class GhostWidget extends WidgetType {
+  constructor(readonly text: string) { super() }
+  eq(other: GhostWidget) { return other.text === this.text }
+  toDOM() {
+    const span = document.createElement('span')
+    span.className = 'cm-ghost'
+    span.textContent = this.text
+    return span
+  }
+}
+
+const GHOSTS: [RegExp, string][] = [
+  [/^Source:\s*$/, '(facultatif sauf si adaptation)'],
+]
 
 /** Décorations de ligne : applique la classe de l'élément détecté à chaque ligne. */
 function buildDecorations(view: EditorView): DecorationSet {
@@ -17,6 +33,12 @@ function buildDecorations(view: EditorView): DecorationSet {
     if (p.lineNo + 1 > total) break
     const line = view.state.doc.line(p.lineNo + 1)
     builder.add(line.from, line.from, Decoration.line({ class: `el el-${p.type}` }))
+    if (p.type === 'title') {
+      const ghost = GHOSTS.find(([re]) => re.test(line.text))
+      if (ghost) {
+        builder.add(line.to, line.to, Decoration.widget({ widget: new GhostWidget(ghost[1]), side: 1 }))
+      }
+    }
   }
   return builder.finish()
 }
@@ -47,6 +69,30 @@ const autoUppercase = EditorView.updateListener.of(u => {
     })
   }
 })
+
+// Tab / Maj+Tab : fait tourner le type de la ligne via les marqueurs de
+// forçage, comme le Tab de Final Draft (auto → .séquence → @personnage →
+// >transition → !action → auto).
+const SIGILS = ['', '.', '@', '>', '!']
+const cycleType = (dir: 1 | -1) => (view: EditorView): boolean => {
+  const { state } = view
+  const line = state.doc.lineAt(state.selection.main.head)
+  const m = /^[.@>!]/.exec(line.text)
+  const cur = m ? SIGILS.indexOf(m[0]) : 0
+  const rest = m ? line.text.slice(1) : line.text
+  const next = SIGILS[(cur + dir + SIGILS.length) % SIGILS.length]
+  const head = state.selection.main.head
+  const delta = next.length - (m ? 1 : 0)
+  const anchor = Math.max(
+    line.from + next.length,
+    Math.min(head + delta, line.from + next.length + rest.length),
+  )
+  view.dispatch({
+    changes: { from: line.from, to: line.to, insert: next + rest },
+    selection: { anchor },
+  })
+  return true
+}
 
 const screenplayHighlight = ViewPlugin.fromClass(
   class {
@@ -93,7 +139,11 @@ export function createEditor(
         lineNumbers(),
         highlightActiveLineGutter(),
         highlightActiveLine(),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        keymap.of([
+          { key: 'Tab', run: cycleType(1), shift: cycleType(-1) },
+          ...defaultKeymap,
+          ...historyKeymap,
+        ]),
         EditorView.lineWrapping,
         // Correcteur orthographique du navigateur (soulignement des fautes).
         EditorView.contentAttributes.of({

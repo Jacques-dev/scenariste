@@ -9,6 +9,7 @@ import { Preview } from './components/Preview'
 import { LintPanel } from './components/LintPanel'
 import { RulesPanel } from './components/RulesPanel'
 import { ScenariosDialog, useSession } from './components/Cloud'
+import { Guide } from './components/Guide'
 import { supabase, saveScenario, signInWithGoogle, ScenarioRow } from './supabase'
 
 type Mode = 'edit' | 'preview' | 'rules'
@@ -63,7 +64,7 @@ const HINTS: Record<string, string> = {
 // Document de départ : les mentions obligatoires de la page de titre
 // (docs/REGLES_FORMATAGE.md §4) plus la source, facultative — la laisser
 // vide ou supprimer la ligne si le scénario n'est pas une adaptation.
-const NEW_DOC = 'Titre: \nÉcrit par: \nSource: (facultatif sauf si adaptation)\n\n'
+const NEW_DOC = 'Titre: \nÉcrit par: \nSource: \n\n'
 
 function download(filename: string, text: string) {
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
@@ -81,6 +82,14 @@ export default function App() {
   const [showLint, setShowLint] = useState(true)
   const [showScenes, setShowScenes] = useState(true)
   const [showExport, setShowExport] = useState(false)
+  // Guide interactif à la première visite (simple marqueur, aucun contenu stocké).
+  const [showGuide, setShowGuide] = useState<boolean>(() => {
+    try { return !localStorage.getItem('scenariste-guide-vu') } catch { return false }
+  })
+  const closeGuide = () => {
+    setShowGuide(false)
+    try { localStorage.setItem('scenariste-guide-vu', '1') } catch { /* stockage bloqué */ }
+  }
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -289,6 +298,7 @@ export default function App() {
           <button className={mode === 'edit' ? 'on' : ''} onClick={() => setMode('edit')}>Éditeur</button>
           <button className={mode === 'preview' ? 'on' : ''} onClick={() => setMode('preview')}>Aperçu paginé</button>
           <button className={mode === 'rules' ? 'on' : ''} onClick={() => setMode('rules')}>Règles</button>
+          <button title="Revoir le guide" onClick={() => { setMode('edit'); setShowGuide(true) }}>?</button>
         </nav>
         <div className="actions">
           <button onClick={onNew}>Nouveau</button>
@@ -344,6 +354,7 @@ export default function App() {
           confirm={askConfirm}
         />
       )}
+      {showGuide && mode === 'edit' && <Guide onClose={closeGuide} />}
       {confirmBox && (
         <div className="overlay" onClick={() => answerConfirm(false)}>
           <div className="dialog" onClick={e => e.stopPropagation()}>

@@ -7,7 +7,6 @@ import { ELEMENTS, ElType } from './rules/spec'
 import { Preview } from './components/Preview'
 import { LintPanel } from './components/LintPanel'
 import { RulesPanel } from './components/RulesPanel'
-import { SAMPLE } from './sample'
 
 type Mode = 'edit' | 'preview' | 'rules'
 const STORAGE_KEY = 'scenariste-doc'
@@ -23,7 +22,7 @@ function download(filename: string, text: string) {
 
 export default function App() {
   const [doc, setDoc] = useState<string>(() => {
-    try { return localStorage.getItem(STORAGE_KEY) ?? SAMPLE } catch { return SAMPLE }
+    try { return localStorage.getItem(STORAGE_KEY) ?? '' } catch { return '' }
   })
   const [cursorLine, setCursorLine] = useState(0)
   const [mode, setMode] = useState<Mode>('edit')
@@ -119,7 +118,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">🎬 Scénariste</div>
+        <div className="brand">Scénariste</div>
         <nav className="tabs">
           <button className={mode === 'edit' ? 'on' : ''} onClick={() => setMode('edit')}>Éditeur</button>
           <button className={mode === 'preview' ? 'on' : ''} onClick={() => setMode('preview')}>Aperçu paginé</button>

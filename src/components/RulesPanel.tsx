@@ -59,8 +59,11 @@ export function RulesPanel() {
 
       <h3>Page de titre</h3>
       <p>
-        En tête de document, renseignez : <code>Titre:</code>, <code>Écrit par:</code> (ou
-        <code> Auteur:</code>), <code>Source:</code>, <code>Contact:</code>, <code>Date:</code>.
+        Seules deux mentions sont obligatoires sur un scénario professionnel :
+        <code> Titre:</code> et <code>Écrit par:</code> (ou <code>Auteur:</code>) — c'est le
+        squelette proposé sur un nouveau document. Facultatif : <code>Contact:</code>
+        (recommandé pour un envoi), <code>Source:</code> (adaptation), <code>Date:</code>.
+        Pas de résumé, de genre ni de numéro de version sur une version de lecture.
         La page de titre est générée dans l'aperçu et l'export.
       </p>
 

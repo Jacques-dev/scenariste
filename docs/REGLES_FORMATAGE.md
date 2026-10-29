@@ -132,12 +132,26 @@ Structure : `INT./EXT. LIEU - MOMENT`
 
 ## 4. Page de titre
 
+**Obligatoire** (les deux seules mentions indispensables) :
+
 - **Titre** en MAJUSCULES, centré, au tiers supérieur de la page (souligné ou non).
-- Deux lignes plus bas, centré : `écrit par` (`written by`), puis le **nom de l'auteur**.
-- Le cas échéant : `d'après l'œuvre de…` (source), numéro de version et date.
-- **Coordonnées** (auteur ou agent) en bas à gauche ; n° d'enregistrement (SACD, WGA…)
-  en bas à droite si souhaité.
-- Aucun numéro de page, aucune illustration, même police Courier 12.
+- Deux lignes plus bas, centré : `écrit par` (`written by`), puis le **nom de l'auteur**
+  (ou des auteurs ; `Histoire de…` / `Story by` au-dessus si le crédit d'histoire est
+  distinct).
+
+**Recommandé** :
+
+- **Coordonnées** de l'auteur ou de son agent en bas à gauche (un e-mail et un téléphone
+  suffisent aujourd'hui).
+- `d'après l'œuvre de…` (source) sous le nom, uniquement pour une adaptation.
+
+**À éviter sur une version de lecture (spec script)** :
+
+- numéro de version, date de draft, mention de copyright, n° d'enregistrement
+  (SACD, WGA…) — réservés aux versions de production ; tolérés mais inutiles ;
+- logline, résumé, genre, illustration : jamais.
+
+Aucun numéro de page ; même police Courier 12 que le reste du script.
 
 ## 5. Règles de pagination
 

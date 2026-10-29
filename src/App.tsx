@@ -19,8 +19,9 @@ const OLD_SAMPLE_SIGNATURE = [
   'adresse@exemple.fr',
 ]
 
-// Document de départ : le squelette de la page de titre, à compléter.
-const NEW_DOC = 'Titre: \nÉcrit par: \nContact: \n\n'
+// Document de départ : les deux seules mentions obligatoires de la page de
+// titre d'un scénario professionnel (docs/REGLES_FORMATAGE.md §4).
+const NEW_DOC = 'Titre: \nÉcrit par: \n\n'
 
 function initialDoc(): string {
   try {

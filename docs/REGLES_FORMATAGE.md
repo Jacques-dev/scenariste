@@ -194,6 +194,7 @@ donc au cas par cas.
 | `scene-caps` ⚡ | Intitulé de séquence entièrement en majuscules | avertissement |
 | `scene-prefix` ⚡ | Point après le préfixe (`INT.`, pas `INT`) | info |
 | `scene-time` | Présence du moment (JOUR/NUIT…) en fin d'intitulé | info |
+| `scene-time-order` ⚡ | Moment mal placé (`INT. JOUR - LIEU`) — déplacé en fin d'intitulé | info |
 | `scene-sep` ⚡ | Moment séparé par un tiret (`- JOUR`) | info |
 | `scene-period` ⚡ | Pas de point final dans l'intitulé | info |
 | `scene-empty` | Séquence sans aucun contenu | avertissement |

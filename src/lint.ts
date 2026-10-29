@@ -27,6 +27,8 @@ const normName = (s: string) => deaccent(upper(s)).replace(/\s+/g, ' ').trim()
 
 /** Moment en fin de ligne, sans exiger le tiret. */
 const TIME_END = new RegExp(`\\s+(${SCENE_TIMES.join('|')})\\s*$`, 'i')
+/** Moment n'importe où dans la ligne (mot entier, accents compris). */
+const TIME_ANY = new RegExp(`(?<![\\p{L}])(${SCENE_TIMES.join('|')})(?![\\p{L}])`, 'iu')
 /** INT/EXT sans point ni slash derrière. */
 const PREFIX_NO_DOT = /^(int|ext)(?=\s)/i
 
@@ -176,9 +178,29 @@ export function lint(parsed: ParsedLine[]): Issue[] {
               label: 'Ajouter le tiret',
               apply: line => line.replace(TIME_END, (_m, t) => ` - ${upper(t)}`),
             })
-        if (!hasDashTime && !hasEndTime)
-          add(p.lineNo, 'scene-time', 'info',
-            'Précisez le moment en fin d\'intitulé : « - JOUR », « - NUIT »…')
+        if (!hasDashTime && !hasEndTime) {
+          const misplaced = TIME_ANY.exec(p.text)
+          if (misplaced)
+            add(p.lineNo, 'scene-time-order', 'info',
+              `Le moment se place en fin d'intitulé : « INT. LIEU - ${upper(misplaced[1])} ».`, {
+                label: 'Déplacer à la fin',
+                apply: line => {
+                  const m = TIME_ANY.exec(line)
+                  if (!m) return line
+                  let rest = line.slice(0, m.index) + line.slice(m.index + m[0].length)
+                  rest = rest
+                    .replace(/\s*[-–—]\s*[-–—]\s*/g, ' - ') // tirets doublés
+                    .replace(/([.:])\s*[-–—]\s*/, '$1 ')    // tiret collé au préfixe
+                    .replace(/\s*[-–—]\s*$/, '')            // tiret final orphelin
+                    .replace(/\s{2,}/g, ' ')
+                    .trimEnd()
+                  return `${rest} - ${upper(m[1])}`
+                },
+              })
+          else
+            add(p.lineNo, 'scene-time', 'info',
+              'Terminez l\'intitulé par le moment : « INT. MAISON DE CAMPAGNE - JOUR ».')
+        }
         if (/\.$/.test(p.text))
           add(p.lineNo, 'scene-period', 'info',
             'Pas de point final dans un intitulé de séquence.', {

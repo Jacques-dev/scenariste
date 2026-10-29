@@ -27,18 +27,19 @@ export function LintPanel({
         </button>
       )}
       {issues.map((it, i) => (
-        <div key={i} className={`lint-item sev-${it.severity}`}>
-          <button className="lint-main" onClick={() => onGoTo(it.lineNo)}>
-            <span className="lint-line">l. {it.lineNo + 1}</span>
-            <span className="lint-sev">{it.severity === 'warn' ? '⚠' : 'ℹ'}</span>
+        <button
+          key={i}
+          className={`lint-item sev-${it.severity}${it.fix ? ' fixable' : ''}`}
+          title={it.fix ? `Cliquer pour corriger : ${it.fix.label}` : 'Cliquer pour aller à la ligne'}
+          onClick={() => (it.fix ? onFix(it) : onGoTo(it.lineNo))}
+        >
+          <span className="lint-line">l. {it.lineNo + 1}</span>
+          <span className="lint-sev">{it.severity === 'warn' ? '⚠' : 'ℹ'}</span>
+          <span className="lint-body">
             <span className="lint-msg">{it.message}</span>
-          </button>
-          {it.fix && (
-            <button className="lint-fix" title={it.fix.label} onClick={() => onFix(it)}>
-              ⚡ {it.fix.label}
-            </button>
-          )}
-        </div>
+            {it.fix && <span className="lint-fixhint">⚡ {it.fix.label}</span>}
+          </span>
+        </button>
       ))}
     </div>
   )

@@ -16,7 +16,7 @@ type Mode = 'edit' | 'preview' | 'rules'
 // Document de départ : les mentions obligatoires de la page de titre
 // (docs/REGLES_FORMATAGE.md §4) plus la source, facultative — la laisser
 // vide ou supprimer la ligne si le scénario n'est pas une adaptation.
-const NEW_DOC = 'Titre: \nÉcrit par: \nSource: \n\n'
+const NEW_DOC = 'Titre: \nÉcrit par: \nSource: (facultatif sauf si adaptation)\n\n'
 
 function download(filename: string, text: string) {
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
@@ -327,7 +327,7 @@ export default function App() {
               <LintPanel
                 issues={issues}
                 onGoTo={goTo}
-                onFix={it => applyFixes([it])}
+                onFix={it => { applyFixes([it]); goTo(it.lineNo) }}
                 onFixAll={fixAll}
               />
             </aside>

@@ -124,7 +124,8 @@ export function titleInfo(parsed: ParsedLine[]): TitleInfo | null {
       info.credit = m[1].trim()
       if (val && !info.author) info.author = val
     } else if (/^(credit|crédit)$/.test(key)) info.credit = val
-    else if (/^source$/.test(key)) info.source = val
+    // L'indication du squelette n'est pas une vraie source.
+    else if (/^source$/.test(key) && !/^\(facultatif[^)]*\)$/i.test(val)) info.source = val
     else if (/^contact$/.test(key)) info.contact = val
     else if (/^(date|version|draft date|draft)$/.test(key)) info.date = val
   }

@@ -33,9 +33,12 @@ export async function saveScenario(id: string | null, content: string): Promise<
   if (!supabase) throw new Error('Supabase non configuré.')
   const payload = { title: titleOf(content), content, updated_at: new Date().toISOString() }
   if (id) {
-    const { error } = await supabase.from('scenarios').update(payload).eq('id', id)
+    // .select() pour détecter un update à 0 ligne (scénario supprimé depuis un
+    // autre appareil, par exemple) : on le recrée au lieu d'échouer en silence.
+    const { data, error } = await supabase
+      .from('scenarios').update(payload).eq('id', id).select('id')
     if (error) throw new Error(error.message)
-    return id
+    if (data && data.length > 0) return id
   }
   const { data, error } = await supabase.from('scenarios').insert(payload).select('id').single()
   if (error) throw new Error(error.message)

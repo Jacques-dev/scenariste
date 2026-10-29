@@ -21,21 +21,25 @@
 
   <h2>Données collectées</h2>
   <ul>
-    <li><strong>Sans compte</strong> : aucune donnée n'est collectée ni stockée. Les textes écrits dans
-      l'éditeur restent dans votre navigateur et disparaissent quand vous quittez la page,
-      sauf si vous les exportez vous-même en fichier.</li>
+    <li><strong>Sans compte</strong> : le site ne collecte ni ne stocke aucune donnée. Les textes
+      écrits dans l'éditeur restent dans votre navigateur et disparaissent quand vous quittez
+      la page, sauf si vous les exportez vous-même en fichier. Comme pour tout site web,
+      l'hébergeur (GitHub Pages) peut journaliser votre adresse IP lors de la visite.</li>
     <li><strong>Avec un compte (connexion Google)</strong> : nous recevons de Google votre adresse
       e-mail et votre identifiant de compte, utilisés uniquement pour vous authentifier et
       associer vos scénarios à votre compte. Les scénarios que vous choisissez d'enregistrer
       sont stockés dans une base de données hébergée par
-      <a href="https://supabase.com">Supabase</a> dans l'Union européenne.</li>
+      <a href="https://supabase.com">Supabase</a> dans l'Union européenne. Votre session de
+      connexion (jeton) est conservée dans le stockage local de votre navigateur jusqu'à
+      votre déconnexion.</li>
   </ul>
 
   <h2>Ce que nous ne faisons pas</h2>
   <ul>
     <li>Aucune publicité, aucun traceur, aucun cookie de suivi, aucune statistique tierce.</li>
-    <li>Vos scénarios ne sont ni lus, ni analysés, ni partagés : seul votre compte y a accès
-      (règles de sécurité au niveau de la base de données).</li>
+    <li>Nous ne consultons, n'analysons ni ne partageons vos scénarios : les règles de
+      sécurité de la base (Row Level Security) réservent chaque scénario au compte qui l'a
+      créé ; seul l'administrateur technique de la base pourrait y accéder, et ne le fait pas.</li>
     <li>Aucune donnée n'est vendue ni transmise à des tiers.</li>
   </ul>
 

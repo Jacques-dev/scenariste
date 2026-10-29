@@ -20,7 +20,9 @@ type Guess =
  * extractible (scan sans OCR).
  */
 export async function importPdf(data: ArrayBuffer): Promise<string> {
-  const doc = await pdfjs.getDocument({ data }).promise
+  // isEvalSupported: false — interdit à pdf.js de compiler du code issu d'un
+  // PDF non fiable (défense en profondeur, sans effet sur l'extraction de texte).
+  const doc = await pdfjs.getDocument({ data, isEvalSupported: false }).promise
   const allLines: RawLine[][] = []
 
   for (let p = 1; p <= doc.numPages; p++) {

@@ -183,8 +183,11 @@ Aucun numéro de page ; même police Courier 12 que le reste du script.
 
 ## 7. Ce que vérifie l'application (lint)
 
-Les règles marquées ⚡ proposent une **correction automatique** en un clic (ou toutes
-d'un coup via « Tout corriger »).
+Les règles marquées ⚡ proposent une **correction automatique** en un clic. Le bouton
+« Tout corriger » les applique toutes, en plusieurs passes si une correction en révèle
+une autre — sauf les corrections marquées ⚡✋, qui engagent le sens du texte
+(renommage d'un personnage, transformation d'une didascalie en action) et se décident
+donc au cas par cas.
 
 | Code | Vérification | Sévérité |
 |---|---|---|
@@ -194,15 +197,15 @@ d'un coup via « Tout corriger »).
 | `scene-sep` ⚡ | Moment séparé par un tiret (`- JOUR`) | info |
 | `scene-period` ⚡ | Pas de point final dans l'intitulé | info |
 | `scene-empty` | Séquence sans aucun contenu | avertissement |
-| `char-variant` | Même personnage orthographié différemment (`MARCEL`/`MARCEl`) | avertissement |
-| `char-near` | Deux noms à une lettre d'écart (faute de frappe probable) | avertissement |
+| `char-variant` ⚡✋ | Même personnage orthographié différemment — renommage partout en un clic | avertissement |
+| `char-near` ⚡✋ | Deux noms à une lettre d'écart — renommage partout en un clic | avertissement |
 | `char-blank` | Ligne seule en MAJUSCULES traitée comme action (réplique oubliée ?) | info |
 | `paren-style` ⚡ | Didascalie en minuscules, sans point final | info |
 | `paren-close` ⚡ | Parenthèse refermée | avertissement |
 | `paren-orphan` | Didascalie hors d'un bloc de dialogue | avertissement |
-| `paren-end` | Didascalie qui termine une réplique | avertissement |
+| `paren-end` ⚡✋ | Didascalie qui termine une réplique — transformation en action | avertissement |
 | `paren-long` | Didascalie de plus d'une ligne (devrait être de l'action) | info |
-| `dialogue-digits` | Nombres en toutes lettres dans les dialogues | info |
+| `dialogue-digits` ⚡ | Nombres convertis en toutes lettres (« 71 » → « soixante et onze ») | info |
 | `transition-colon` ⚡ | Transition terminée par `:` | info |
 | `action-we-see` | « nous voyons / on voit » implicite | info |
 | `action-camera` | Indications de caméra à éviter | info |

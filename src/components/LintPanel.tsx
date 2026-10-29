@@ -11,7 +11,7 @@ export function LintPanel({
   onFix: (issue: Issue) => void
   onFixAll: () => void
 }) {
-  const fixable = issues.filter(i => i.fix).length
+  const fixable = issues.filter(i => i.fix && !i.fix.manual).length
   if (issues.length === 0) {
     return (
       <div className="lint-panel">

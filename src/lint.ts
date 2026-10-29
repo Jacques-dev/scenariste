@@ -3,10 +3,14 @@ import { ELEMENTS, REGEX, SCENE_TIMES, isUpperLine } from './rules/spec'
 
 export type Severity = 'warn' | 'info'
 
-/** Correction automatique applicable à la ligne concernée. */
+/** Correction automatique applicable à la (ou aux) ligne(s) concernée(s). */
 export interface Fix {
   label: string
   apply: (lineText: string) => string
+  /** Lignes supplémentaires auxquelles appliquer la même transformation. */
+  lines?: number[]
+  /** true : correction à décider au cas par cas, exclue de « Tout corriger ». */
+  manual?: boolean
 }
 
 export interface Issue {
@@ -49,6 +53,52 @@ function near(a: string, b: string): boolean {
   return true
 }
 
+/* --- nombres en toutes lettres (0 à 999 999) --- */
+const UNITS = [
+  'zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix',
+  'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf',
+]
+const TENS = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', '', 'quatre-vingt']
+
+function below100(n: number): string {
+  if (n < 20) return UNITS[n]
+  const t = Math.floor(n / 10)
+  const u = n % 10
+  if (t === 7 || t === 9) {
+    const base = t === 7 ? 'soixante' : 'quatre-vingt'
+    if (t === 7 && u === 1) return 'soixante et onze'
+    return `${base}-${UNITS[10 + u]}`
+  }
+  if (u === 0) return t === 8 ? 'quatre-vingts' : TENS[t]
+  if (u === 1 && t !== 8) return `${TENS[t]} et un`
+  return `${TENS[t]}-${UNITS[u]}`
+}
+
+function below1000(n: number): string {
+  const h = Math.floor(n / 100)
+  const r = n % 100
+  if (h === 0) return below100(r)
+  const cent = h === 1 ? 'cent' : `${UNITS[h]} cent${r === 0 ? 's' : ''}`
+  return r === 0 ? cent : `${cent} ${below100(r)}`
+}
+
+export function numberToFrench(n: number): string {
+  if (n < 1000) return below1000(n)
+  const k = Math.floor(n / 1000)
+  const r = n % 1000
+  const mille = k === 1 ? 'mille' : `${below1000(k)} mille`
+  return r === 0 ? mille : `${mille} ${below1000(r)}`
+}
+
+/** Nombres isolés uniquement : « 15 heures » oui, « 15h » ou « A4 » non. */
+const LONE_NUMBER = /(?<![\p{L}\d])\d{1,6}(?![\p{L}\d])/gu
+
+/** Réécrit le nom d'une ligne de personnage en conservant @ et l'extension (V.O.)… */
+function renameCue(main: string) {
+  return (line: string) =>
+    line.replace(/^(\s*@?\s*)(.*?)(\s*\([^)]*\))?\s*$/u, (_m, pre, _name, ext) => `${pre}${main}${ext ?? ''}`)
+}
+
 function nextNonBlank(parsed: ParsedLine[], from: number): ParsedLine | undefined {
   for (let i = from + 1; i < parsed.length; i++) {
     if (parsed[i].type !== 'blank') return parsed[i]
@@ -69,7 +119,7 @@ export function lint(parsed: ParsedLine[]): Issue[] {
   let lastDigitsLine = -10
 
   // Noms de personnages : variantes regroupées par forme normalisée.
-  const charGroups = new Map<string, Map<string, { count: number; firstLine: number }>>()
+  const charGroups = new Map<string, Map<string, { count: number; firstLine: number; lines: number[] }>>()
 
   const flushRuns = () => {
     if (actionRun > 6)
@@ -148,8 +198,8 @@ export function lint(parsed: ParsedLine[]): Issue[] {
           if (!charGroups.has(key)) charGroups.set(key, new Map())
           const variants = charGroups.get(key)!
           const v = variants.get(core)
-          if (v) v.count++
-          else variants.set(core, { count: 1, firstLine: p.lineNo })
+          if (v) { v.count++; v.lines.push(p.lineNo) }
+          else variants.set(core, { count: 1, firstLine: p.lineNo, lines: [p.lineNo] })
         }
         break
       }
@@ -174,14 +224,26 @@ export function lint(parsed: ParsedLine[]): Issue[] {
         const after = nextNonBlank(parsed, i)
         if (!after || (after.type !== 'dialogue' && after.type !== 'parenthetical'))
           add(p.lineNo, 'paren-end', 'warn',
-            'Une didascalie ne termine jamais une réplique : déplacez-la avant le dialogue ou écrivez-la en action.')
+            'Une didascalie ne termine jamais une réplique : déplacez-la avant le dialogue ou écrivez-la en action.', {
+              label: 'Passer en action',
+              manual: true,
+              apply: line => {
+                const inner = line.trim().replace(/^\(|\)$/g, '').trim()
+                const cap = inner.charAt(0).toLocaleUpperCase('fr-FR') + inner.slice(1)
+                return `\n${cap}${/[.!?…]$/.test(cap) ? '' : '.'}`
+              },
+            })
         break
       }
       case 'dialogue': {
-        if (/\d/.test(p.text) && p.lineNo > lastDigitsLine + 1) {
+        if (LONE_NUMBER.test(p.text) && p.lineNo > lastDigitsLine + 1) {
           add(p.lineNo, 'dialogue-digits', 'info',
-            'Dans un dialogue, les nombres s\'écrivent en toutes lettres (« dix-sept », pas « 17 »).')
+            'Dans un dialogue, les nombres s\'écrivent en toutes lettres (« dix-sept », pas « 17 »).', {
+              label: 'Écrire en lettres',
+              apply: line => line.replace(LONE_NUMBER, m => numberToFrench(parseInt(m, 10))),
+            })
         }
+        LONE_NUMBER.lastIndex = 0
         if (/\d/.test(p.text)) lastDigitsLine = p.lineNo
         break
       }
@@ -225,16 +287,30 @@ export function lint(parsed: ParsedLine[]): Issue[] {
     const main = sorted[0][0]
     for (const [v, info] of sorted.slice(1))
       add(info.firstLine, 'char-variant', 'warn',
-        `« ${v} » et « ${main} » : le nom d'un personnage doit rester strictement identique.`)
+        `« ${v} » et « ${main} » : le nom d'un personnage doit rester strictement identique.`, {
+          label: `Renommer en « ${main} » (${info.count}×)`,
+          manual: true,
+          apply: renameCue(main),
+          lines: info.lines,
+        })
   }
   const keys = [...charGroups.keys()].filter(k => k.length >= 4)
+  const total = (k: string) => [...charGroups.get(k)!.values()].reduce((s, v) => s + v.count, 0)
+  const allLines = (k: string) => [...charGroups.get(k)!.values()].flatMap(v => v.lines)
   for (let a = 0; a < keys.length; a++) {
     for (let b = a + 1; b < keys.length; b++) {
       if (!near(keys[a], keys[b])) continue
-      const nameA = [...charGroups.get(keys[a])!.keys()][0]
-      const entryB = [...charGroups.get(keys[b])!.entries()][0]
-      add(entryB[1].firstLine, 'char-near', 'warn',
-        `« ${entryB[0]} » et « ${nameA} » : deux orthographes du même personnage ?`)
+      // On propose de renommer le moins fréquent vers le plus fréquent.
+      const [keep, drop] = total(keys[a]) >= total(keys[b]) ? [keys[a], keys[b]] : [keys[b], keys[a]]
+      const keepName = [...charGroups.get(keep)!.keys()][0]
+      const dropEntry = [...charGroups.get(drop)!.entries()][0]
+      add(dropEntry[1].firstLine, 'char-near', 'warn',
+        `« ${dropEntry[0]} » et « ${keepName} » : deux orthographes du même personnage ?`, {
+          label: `Renommer en « ${keepName} » (${total(drop)}×)`,
+          manual: true,
+          apply: renameCue(keepName),
+          lines: allLines(drop),
+        })
     }
   }
 

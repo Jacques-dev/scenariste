@@ -37,6 +37,15 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // Boîte de confirmation stylée (remplace window.confirm).
+  const [confirmBox, setConfirmBox] = useState<{ message: string; resolve: (ok: boolean) => void } | null>(null)
+  const askConfirm = (message: string) =>
+    new Promise<boolean>(resolve => setConfirmBox({ message, resolve }))
+  const answerConfirm = (ok: boolean) => {
+    confirmBox?.resolve(ok)
+    setConfirmBox(null)
+  }
+
   // Stockage cloud (Supabase) — inactif tant que src/config.ts est vide.
   const session = useSession()
   const [showList, setShowList] = useState(false)
@@ -93,8 +102,9 @@ export default function App() {
     requestAnimationFrame(() => editor.current?.goToLine(lineNo))
   }
 
-  const onNew = () => {
-    if (doc.trim() && !window.confirm('Remplacer le document actuel par un document vide ?')) return
+  const onNew = async () => {
+    const dirty = doc.trim() !== '' && doc.trim() !== NEW_DOC.trim() && doc !== lastSavedRef.current
+    if (dirty && !(await askConfirm('Remplacer le document actuel par un document vide ? Le texte non enregistré sera perdu.'))) return
     setText(NEW_DOC)
     setCurrentId(null)
     lastSavedRef.current = ''
@@ -116,10 +126,10 @@ export default function App() {
     }
   }
 
-  const onOpenScenario = (row: ScenarioRow) => {
+  const onOpenScenario = async (row: ScenarioRow) => {
     const d = docRef.current
     if (d.trim() !== NEW_DOC.trim() && d !== lastSavedRef.current &&
-        !window.confirm('Le document en cours n\'est pas enregistré. L\'écraser ?')) return
+        !(await askConfirm('Le document en cours n\'est pas enregistré. L\'écraser ?'))) return
     setText(row.content)
     setCurrentId(row.id)
     lastSavedRef.current = row.content
@@ -133,8 +143,11 @@ export default function App() {
     if (!view) return
     const byLine = new Map<number, Issue[]>()
     for (const it of toFix) {
-      if (!it.fix || it.lineNo + 1 > view.state.doc.lines) continue
-      byLine.set(it.lineNo, [...(byLine.get(it.lineNo) ?? []), it])
+      if (!it.fix) continue
+      for (const ln of it.fix.lines ?? [it.lineNo]) {
+        if (ln + 1 > view.state.doc.lines) continue
+        byLine.set(ln, [...(byLine.get(ln) ?? []), it])
+      }
     }
     const changes = [...byLine.entries()].flatMap(([lineNo, its]) => {
       const line = view.state.doc.line(lineNo + 1)
@@ -143,6 +156,20 @@ export default function App() {
       return text === line.text ? [] : [{ from: line.from, to: line.to, insert: text }]
     })
     if (changes.length) view.dispatch({ changes })
+  }
+
+  // « Tout corriger » : enchaîne les passes (une correction peut en révéler une
+  // autre), en excluant les corrections à décider au cas par cas (fix.manual).
+  const fixAll = () => {
+    const view = editor.current?.view
+    if (!view) return
+    for (let pass = 0; pass < 5; pass++) {
+      const before = view.state.doc.toString()
+      const fixable = lint(parseScript(before)).filter(i => i.fix && !i.fix.manual)
+      if (fixable.length === 0) break
+      applyFixes(fixable)
+      if (view.state.doc.toString() === before) break
+    }
   }
 
   const onLogin = () => {
@@ -178,7 +205,8 @@ export default function App() {
       } else {
         text = await file.text()
       }
-      if (doc.trim() && !window.confirm(`Remplacer le document actuel par « ${file.name} » reformaté ?`)) {
+      const dirty = doc.trim() !== '' && doc.trim() !== NEW_DOC.trim() && doc !== lastSavedRef.current
+      if (dirty && !(await askConfirm(`Remplacer le document actuel par « ${file.name} » reformaté ?`))) {
         setBusy(false)
         return
       }
@@ -262,7 +290,24 @@ export default function App() {
         <div className="notice" onClick={() => setNotice(null)}>{notice} ✕</div>
       )}
       {showList && (
-        <ScenariosDialog currentId={currentId} onOpen={onOpenScenario} onClose={() => setShowList(false)} />
+        <ScenariosDialog
+          currentId={currentId}
+          onOpen={onOpenScenario}
+          onClose={() => setShowList(false)}
+          confirm={askConfirm}
+        />
+      )}
+      {confirmBox && (
+        <div className="overlay" onClick={() => answerConfirm(false)}>
+          <div className="dialog" onClick={e => e.stopPropagation()}>
+            <h3>Confirmation</h3>
+            <p className="dialog-sub">{confirmBox.message}</p>
+            <div className="dialog-actions">
+              <button className="accent" autoFocus onClick={() => answerConfirm(true)}>Confirmer</button>
+              <button className="ghost" onClick={() => answerConfirm(false)}>Annuler</button>
+            </div>
+          </div>
+        </div>
       )}
 
       <main className={`main mode-${mode}`}>
@@ -283,7 +328,7 @@ export default function App() {
                 issues={issues}
                 onGoTo={goTo}
                 onFix={it => applyFixes([it])}
-                onFixAll={() => applyFixes(issues)}
+                onFixAll={fixAll}
               />
             </aside>
           )}

@@ -18,10 +18,12 @@ export function ScenariosDialog({
   currentId,
   onOpen,
   onClose,
+  confirm,
 }: {
   currentId: string | null
   onOpen: (row: ScenarioRow) => void
   onClose: () => void
+  confirm: (message: string) => Promise<boolean>
 }) {
   const [rows, setRows] = useState<ScenarioRow[] | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
@@ -32,7 +34,7 @@ export function ScenariosDialog({
   useEffect(refresh, [])
 
   const remove = async (row: ScenarioRow) => {
-    if (!window.confirm(`Supprimer définitivement « ${row.title} » ?`)) return
+    if (!(await confirm(`Supprimer définitivement « ${row.title} » ?`))) return
     try {
       await deleteScenario(row.id)
       refresh()

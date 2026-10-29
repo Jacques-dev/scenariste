@@ -87,6 +87,13 @@ export function createEditor(
         highlightActiveLine(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
+        // Correcteur orthographique du navigateur (soulignement des fautes).
+        EditorView.contentAttributes.of({
+          spellcheck: 'true',
+          autocorrect: 'off',
+          autocapitalize: 'off',
+          lang: 'fr',
+        }),
         placeholder('INT. LIEU - JOUR  …puis décrivez l\'action. Un NOM EN MAJUSCULES seul sur sa ligne ouvre un dialogue.'),
         screenplayHighlight,
         autoUppercase,

@@ -183,17 +183,34 @@ Aucun numéro de page ; même police Courier 12 que le reste du script.
 
 ## 7. Ce que vérifie l'application (lint)
 
+Les règles marquées ⚡ proposent une **correction automatique** en un clic (ou toutes
+d'un coup via « Tout corriger »).
+
 | Code | Vérification | Sévérité |
 |---|---|---|
-| `scene-caps` | Intitulé de séquence entièrement en majuscules | avertissement |
+| `scene-caps` ⚡ | Intitulé de séquence entièrement en majuscules | avertissement |
+| `scene-prefix` ⚡ | Point après le préfixe (`INT.`, pas `INT`) | info |
 | `scene-time` | Présence du moment (JOUR/NUIT…) en fin d'intitulé | info |
+| `scene-sep` ⚡ | Moment séparé par un tiret (`- JOUR`) | info |
+| `scene-period` ⚡ | Pas de point final dans l'intitulé | info |
+| `scene-empty` | Séquence sans aucun contenu | avertissement |
+| `char-variant` | Même personnage orthographié différemment (`MARCEL`/`MARCEl`) | avertissement |
+| `char-near` | Deux noms à une lettre d'écart (faute de frappe probable) | avertissement |
 | `char-blank` | Ligne seule en MAJUSCULES traitée comme action (réplique oubliée ?) | info |
-| `paren-style` | Didascalie en minuscules, sans point final | info |
+| `paren-style` ⚡ | Didascalie en minuscules, sans point final | info |
+| `paren-close` ⚡ | Parenthèse refermée | avertissement |
 | `paren-orphan` | Didascalie hors d'un bloc de dialogue | avertissement |
+| `paren-end` | Didascalie qui termine une réplique | avertissement |
 | `paren-long` | Didascalie de plus d'une ligne (devrait être de l'action) | info |
-| `transition-colon` | Transition terminée par `:` | info |
+| `dialogue-digits` | Nombres en toutes lettres dans les dialogues | info |
+| `transition-colon` ⚡ | Transition terminée par `:` | info |
+| `action-we-see` | « nous voyons / on voit » implicite | info |
+| `action-camera` | Indications de caméra à éviter | info |
 | `action-long` | Paragraphe d'action > 6 lignes | info |
 | `dialogue-long` | Réplique > 12 lignes | info |
+| `double-space` ⚡ | Doubles espaces | info |
 
-Le formatage « dur » (retraits, largeurs, casse d'affichage, pagination, `(SUITE)`) est
-appliqué automatiquement par l'éditeur et l'export : il n'a pas besoin d'être vérifié.
+Le formatage « dur » (retraits, largeurs, casse, pagination, `(SUITE)`) est appliqué
+automatiquement par l'éditeur et l'export : il n'a pas besoin d'être vérifié. L'éditeur
+active en outre le correcteur orthographique du navigateur (fautes soulignées, clic
+droit pour corriger).

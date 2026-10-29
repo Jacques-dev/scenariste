@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createEditor, EditorHandle } from './editor'
 import { parseScript, stats } from './parser'
-import { lint } from './lint'
+import { lint, Issue } from './lint'
+import { SceneNav } from './components/SceneNav'
 import { paginate } from './paginate'
 import { ELEMENTS, ElType } from './rules/spec'
 import { Preview } from './components/Preview'
@@ -31,6 +32,8 @@ export default function App() {
   const [cursorLine, setCursorLine] = useState(0)
   const [mode, setMode] = useState<Mode>('edit')
   const [showLint, setShowLint] = useState(true)
+  const [showScenes, setShowScenes] = useState(true)
+  const [showExport, setShowExport] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -124,6 +127,24 @@ export default function App() {
     setMode('edit')
   }
 
+  // Applique les corrections automatiques du vérificateur (chaînées par ligne).
+  const applyFixes = (toFix: Issue[]) => {
+    const view = editor.current?.view
+    if (!view) return
+    const byLine = new Map<number, Issue[]>()
+    for (const it of toFix) {
+      if (!it.fix || it.lineNo + 1 > view.state.doc.lines) continue
+      byLine.set(it.lineNo, [...(byLine.get(it.lineNo) ?? []), it])
+    }
+    const changes = [...byLine.entries()].flatMap(([lineNo, its]) => {
+      const line = view.state.doc.line(lineNo + 1)
+      let text = line.text
+      for (const it of its) text = it.fix!.apply(text)
+      return text === line.text ? [] : [{ from: line.from, to: line.to, insert: text }]
+    })
+    if (changes.length) view.dispatch({ changes })
+  }
+
   const onLogin = () => {
     signInWithGoogle().catch(e => setNotice(`Connexion impossible : ${e.message}`))
   }
@@ -199,9 +220,25 @@ export default function App() {
           <button onClick={() => fileInput.current?.click()} disabled={busy}>
             {busy ? 'Import…' : 'Importer PDF/texte'}
           </button>
-          <button onClick={exportPdf}>Exporter PDF</button>
-          <button onClick={() => download(`${baseName()}.fountain`, doc)}>.fountain</button>
-          <button onClick={() => download(`${baseName()}.txt`, doc)}>.txt</button>
+          <div className="menu-wrap">
+            <button onClick={() => setShowExport(v => !v)}>Exporter ▾</button>
+            {showExport && (
+              <>
+                <div className="menu-backdrop" onClick={() => setShowExport(false)} />
+                <div className="menu">
+                  <button onClick={() => { setShowExport(false); exportPdf() }}>
+                    PDF <span className="menu-hint">mise en page finale, via impression</span>
+                  </button>
+                  <button onClick={() => { setShowExport(false); download(`${baseName()}.fountain`, doc) }}>
+                    Fountain <span className="menu-hint">pour Final Draft, Highland…</span>
+                  </button>
+                  <button onClick={() => { setShowExport(false); download(`${baseName()}.txt`, doc) }}>
+                    Texte brut <span className="menu-hint">.txt universel</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           {supabase && !session && (
             <button className="accent" onClick={onLogin}>Se connecter avec Google</button>
           )}
@@ -230,6 +267,9 @@ export default function App() {
 
       <main className={`main mode-${mode}`}>
         <div className="editor-wrap" style={{ display: mode === 'edit' ? undefined : 'none' }}>
+          {showScenes && (
+            <SceneNav parsed={parsed} cursorLine={cursorLine} onGo={goTo} onClose={() => setShowScenes(false)} />
+          )}
           <div className="editor-page">
             <div ref={editorHost} className="editor-host" />
           </div>
@@ -239,7 +279,12 @@ export default function App() {
                 Remarques ({issues.length})
                 <button className="side-close" onClick={() => setShowLint(false)}>✕</button>
               </div>
-              <LintPanel issues={issues} onGoTo={goTo} />
+              <LintPanel
+                issues={issues}
+                onGoTo={goTo}
+                onFix={it => applyFixes([it])}
+                onFixAll={() => applyFixes(issues)}
+              />
             </aside>
           )}
         </div>
@@ -248,6 +293,9 @@ export default function App() {
       </main>
 
       <footer className="statusbar">
+        <button className="st-toggle" onClick={() => { setMode('edit'); setShowScenes(v => !v) }}>
+          ☰ Séquences
+        </button>
         <span className="st-el">{currentType ? ELEMENTS[currentType].label : '—'}</span>
         <span>{pageCount} page{pageCount > 1 ? 's' : ''} (≈ {pageCount} min)</span>
         <span>{st.scenes} séquence{st.scenes > 1 ? 's' : ''}</span>

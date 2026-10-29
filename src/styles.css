@@ -90,7 +90,7 @@ button.ghost { background: none !important; }
 }
 .editor-host {
   background: #fdfdfb; color: #1a1a1a;
-  width: calc(60ch + 60px);
+  width: calc(60ch + 60px + 22px); /* + la gouttière des numéros de ligne */
   max-width: 100%;
   margin: 0 auto; min-height: calc(100% - 20px);
   box-shadow: 0 2px 14px rgba(0,0,0,.5);
@@ -107,6 +107,16 @@ button.ghost { background: none !important; }
 }
 .cm-line { padding: 0 !important; }
 .cm-activeLine { background: rgba(70, 120, 200, .07) !important; }
+
+/* Numéros de ligne : discrets, dans la marge de la page. */
+.cm-gutters {
+  background: transparent !important;
+  border-right: 1px solid #ececec !important;
+  color: #b8b8b8 !important;
+  font-size: 11px;
+}
+.cm-lineNumbers .cm-gutterElement { padding: 0 10px 0 6px; min-width: 34px; }
+.cm-activeLineGutter { background: rgba(70, 120, 200, .12) !important; color: #555 !important; }
 .cm-placeholder { color: #999 !important; white-space: pre-wrap !important; }
 
 /* Retraits des éléments — doivent refléter src/rules/spec.ts */

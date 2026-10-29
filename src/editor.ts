@@ -1,6 +1,6 @@
 import {
   EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate, keymap,
-  drawSelection, highlightActiveLine, placeholder,
+  drawSelection, highlightActiveLine, placeholder, lineNumbers, highlightActiveLineGutter,
 } from '@codemirror/view'
 import { EditorState, RangeSetBuilder } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -84,6 +84,8 @@ export function createEditor(
       extensions: [
         history(),
         drawSelection(),
+        lineNumbers(),
+        highlightActiveLineGutter(),
         highlightActiveLine(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,

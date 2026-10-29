@@ -60,11 +60,18 @@ export function RulesPanel() {
       <h3>Page de titre</h3>
       <p>
         Seules deux mentions sont obligatoires sur un scénario professionnel :
-        <code> Titre:</code> et <code>Écrit par:</code> (ou <code>Auteur:</code>) — c'est le
-        squelette proposé sur un nouveau document. Facultatif : <code>Contact:</code>
-        (recommandé pour un envoi), <code>Source:</code> (adaptation), <code>Date:</code>.
-        Pas de résumé, de genre ni de numéro de version sur une version de lecture.
-        La page de titre est générée dans l'aperçu et l'export.
+        <code> Titre:</code> et <code>Écrit par:</code> (ou <code>Auteur:</code>).
+        Le squelette d'un nouveau document les propose, plus une
+        <code> Source:</code> facultative (adaptation) — laissez-la vide ou supprimez la
+        ligne, elle n'apparaîtra pas. Autres lignes reconnues : <code>Contact:</code>
+        (recommandé pour un envoi), <code>Date:</code>. Pas de résumé, de genre ni de
+        numéro de version sur une version de lecture. La page de titre est générée dans
+        l'aperçu et l'export.
+      </p>
+      <p>
+        <strong>Le site ne conserve rien</strong> : chaque visite repart d'un document
+        vierge. Exportez votre travail (<code>.fountain</code> de préférence) avant de
+        quitter la page — une alerte vous prévient si vous partez sans l'avoir fait.
       </p>
 
       <h3>Pagination automatique</h3>

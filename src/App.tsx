@@ -9,33 +9,11 @@ import { LintPanel } from './components/LintPanel'
 import { RulesPanel } from './components/RulesPanel'
 
 type Mode = 'edit' | 'preview' | 'rules'
-const STORAGE_KEY = 'scenariste-doc'
 
-// Les premières versions pré-remplissaient l'éditeur avec un scénario d'exemple,
-// que la sauvegarde automatique a pu enregistrer chez les visiteurs : on le purge.
-const OLD_SAMPLE_SIGNATURE = [
-  'Titre: LA DERNIÈRE SÉANCE',
-  'INT. CINÉMA LE ROYAL - SALLE DE PROJECTION - NUIT',
-  'adresse@exemple.fr',
-]
-
-// Document de départ : les deux seules mentions obligatoires de la page de
-// titre d'un scénario professionnel (docs/REGLES_FORMATAGE.md §4).
-const NEW_DOC = 'Titre: \nÉcrit par: \n\n'
-
-function initialDoc(): string {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved == null || saved.trim() === '') return NEW_DOC
-    if (OLD_SAMPLE_SIGNATURE.every(s => saved.includes(s))) {
-      localStorage.removeItem(STORAGE_KEY)
-      return NEW_DOC
-    }
-    return saved
-  } catch {
-    return NEW_DOC
-  }
-}
+// Document de départ : les mentions obligatoires de la page de titre
+// (docs/REGLES_FORMATAGE.md §4) plus la source, facultative — la laisser
+// vide ou supprimer la ligne si le scénario n'est pas une adaptation.
+const NEW_DOC = 'Titre: \nÉcrit par: \nSource: \n\n'
 
 function download(filename: string, text: string) {
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
@@ -47,7 +25,7 @@ function download(filename: string, text: string) {
 }
 
 export default function App() {
-  const [doc, setDoc] = useState<string>(initialDoc)
+  const [doc, setDoc] = useState<string>(NEW_DOC)
   const [cursorLine, setCursorLine] = useState(0)
   const [mode, setMode] = useState<Mode>('edit')
   const [showLint, setShowLint] = useState(true)
@@ -68,13 +46,18 @@ export default function App() {
     })
   }, [])
 
-  // Sauvegarde locale (débouncée).
+  // Chaque visite repart d'un document vierge : rien n'est conservé.
+  // On prévient donc avant de quitter si un travail en cours serait perdu.
   useEffect(() => {
-    const id = setTimeout(() => {
-      try { localStorage.setItem(STORAGE_KEY, doc) } catch { /* stockage plein ou bloqué */ }
-    }, 400)
-    return () => clearTimeout(id)
-  }, [doc])
+    const warn = (e: BeforeUnloadEvent) => {
+      if (docRef.current.trim() !== NEW_DOC.trim()) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [])
 
   const parsed = useMemo(() => parseScript(doc), [doc])
   const issues = useMemo(() => lint(parsed), [parsed])

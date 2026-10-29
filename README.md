@@ -18,7 +18,8 @@ Site web d'écriture de scénarios au format professionnel (standard internation
 - **Import** : PDF (texte extractible), `.txt` ou `.fountain` — le texte est reclassé
   par retraits et contenu, puis reformaté.
 - **Export** : PDF (via l'aperçu paginé → impression), `.fountain`, `.txt`.
-- Sauvegarde automatique dans le navigateur (localStorage).
+- Chaque visite repart d'un document vierge (rien n'est stocké) ; une alerte prévient
+  avant de quitter la page si un travail non exporté serait perdu.
 
 ## Règles de formatage
 

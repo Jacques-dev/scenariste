@@ -21,6 +21,33 @@ function buildDecorations(view: EditorView): DecorationSet {
   return builder.finish()
 }
 
+// Majuscules automatiques : les intitulés de séquence (et les personnages ou
+// transitions forcés) sont réellement convertis dans le texte, pas seulement à
+// l'affichage, pour que le vérificateur et les exports restent cohérents avec
+// ce que l'auteur voit à l'écran.
+const autoUppercase = EditorView.updateListener.of(u => {
+  if (!u.docChanged || u.view.composing) return
+  const { state } = u.view
+  const parsed = parseScript(state.doc.toString())
+  const changes: { from: number; to: number; insert: string }[] = []
+  for (const p of parsed) {
+    if (p.type !== 'scene' && p.type !== 'character' && p.type !== 'transition') continue
+    if (p.lineNo + 1 > state.doc.lines) break
+    const line = state.doc.line(p.lineNo + 1)
+    const upper = line.text.toLocaleUpperCase('fr-FR')
+    if (upper !== line.text && upper.length === line.text.length) {
+      changes.push({ from: line.from, to: line.to, insert: upper })
+    }
+  }
+  if (changes.length) {
+    // On ne peut pas dispatcher depuis un update listener : on diffère d'une
+    // microtâche, en vérifiant que le document n'a pas bougé entre-temps.
+    queueMicrotask(() => {
+      if (u.view.state.doc === state.doc) u.view.dispatch({ changes })
+    })
+  }
+})
+
 const screenplayHighlight = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet
@@ -62,6 +89,7 @@ export function createEditor(
         EditorView.lineWrapping,
         placeholder('INT. LIEU - JOUR  …puis décrivez l\'action. Un NOM EN MAJUSCULES seul sur sa ligne ouvre un dialogue.'),
         screenplayHighlight,
+        autoUppercase,
         EditorView.updateListener.of(u => {
           if (u.docChanged || u.selectionSet) {
             const line = u.state.doc.lineAt(u.state.selection.main.head).number - 1

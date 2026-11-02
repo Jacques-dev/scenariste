@@ -29,8 +29,8 @@ const normName = (s: string) => deaccent(upper(s)).replace(/\s+/g, ' ').trim()
 const TIME_END = new RegExp(`\\s+(${SCENE_TIMES.join('|')})\\s*$`, 'i')
 /** Moment n'importe où dans la ligne (mot entier, accents compris). */
 const TIME_ANY = new RegExp(`(?<![\\p{L}])(${SCENE_TIMES.join('|')})(?![\\p{L}])`, 'iu')
-/** INT/EXT sans point ni slash derrière. */
-const PREFIX_NO_DOT = /^(int|ext)(?=\s)/i
+/** INT/EXT sans point ni slash derrière (espace ou tiret : « INT LIEU », « INT-NUIT-LIEU »). */
+const PREFIX_NO_DOT = /^(int|ext)(?=\s|[-–—])/i
 
 /** Distance d'édition ≤ 1 entre deux noms (substitution, insertion ou suppression). */
 function near(a: string, b: string): boolean {
@@ -168,7 +168,7 @@ export function lint(parsed: ParsedLine[]): Issue[] {
           add(p.lineNo, 'scene-prefix', 'info',
             'Ajoutez un point après le préfixe : « INT. », « EXT. ».', {
               label: 'Ajouter le point',
-              apply: line => line.replace(/^(\s*)(int|ext)(?=\s)/i, (_m, a, b) => a + upper(b) + '.'),
+              apply: line => line.replace(/^(\s*)(int|ext)\s*[-–—]?\s*/i, (_m, a, b) => `${a}${upper(b)}. `),
             })
         const hasDashTime = REGEX.sceneTime.test(p.text)
         const hasEndTime = TIME_END.test(p.text)
@@ -223,6 +223,15 @@ export function lint(parsed: ParsedLine[]): Issue[] {
           if (v) { v.count++; v.lines.push(p.lineNo) }
           else variants.set(core, { count: 1, firstLine: p.lineNo, lines: [p.lineNo] })
         }
+        const ext = REGEX.charExtension.exec(p.text)
+        if (core && ext && !REGEX.knownExtension.test(ext[1].trim()))
+          add(p.lineNo, 'char-paren', 'warn',
+            'Sur la ligne du nom, seules les extensions (V.O.), (OFF), (SUITE)… sont admises : ' +
+            'une indication de jeu se place sur sa propre ligne, entre le nom et la réplique.', {
+              label: 'Passer à la ligne',
+              apply: line => line.replace(/\s*\(([^)]*)\)\s*$/, (_m, inner: string) =>
+                `\n(${inner.trim().toLocaleLowerCase('fr-FR')})`),
+            })
         break
       }
       case 'parenthetical': {
@@ -270,7 +279,7 @@ export function lint(parsed: ParsedLine[]): Issue[] {
         break
       }
       case 'transition': {
-        if (!/:$/.test(p.text) && !/^(FADE OUT|FIN)\b/i.test(p.text))
+        if (!/:$/.test(p.text) && !/^FADE OUT\b/i.test(p.text))
           add(p.lineNo, 'transition-colon', 'info',
             'Une transition se termine par deux-points : « CUT TO: », « FONDU AU NOIR : ».', {
               label: 'Ajouter « : »',

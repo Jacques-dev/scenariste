@@ -95,6 +95,9 @@ Structure : `INT./EXT. LIEU - MOMENT`
     en France : `(OFF)` ;
   - `(SUITE)` / `(CONT'D)` — même personnage qui reprend la parole après une action, ou
     dialogue repris après un saut de page.
+- **Seules ces extensions** vont sur la ligne du nom. Une indication de jeu
+  (`(d'un ton menaçant)`, `(à Marie)`) n'y a pas sa place : c'est une didascalie, sur sa
+  propre ligne entre le nom et la réplique, en minuscules.
 - Personnages non nommés : fonction en majuscules (`LE SERVEUR`, `POLICIER 1`).
 
 ### 3.4 Didascalie (*parenthetical* / « parenthèse »)
@@ -120,7 +123,8 @@ Structure : `INT./EXT. LIEU - MOMENT`
 - Alignées à **droite**, MAJUSCULES, terminées par deux-points : `CUT TO:`, `DISSOLVE TO:`,
   `SMASH CUT TO:` ; en France : `FONDU AU NOIR :`, `FONDU ENCHAÎNÉ :`.
 - Exceptions alignées à **gauche** : `FADE IN:` (`OUVERTURE EN FONDU :`) en tout début de
-  script ; `FADE OUT.` / `FIN` en toute fin.
+  script ; `FADE OUT.` en toute fin.
+- `FIN` n'est pas une transition mais un carton **centré** (voir 3.7).
 - Le *cut* étant implicite entre deux séquences, les transitions explicites sont rares dans
   une version de lecture.
 
@@ -192,7 +196,7 @@ donc au cas par cas.
 | Code | Vérification | Sévérité |
 |---|---|---|
 | `scene-caps` ⚡ | Intitulé de séquence entièrement en majuscules | avertissement |
-| `scene-prefix` ⚡ | Point après le préfixe (`INT.`, pas `INT`) | info |
+| `scene-prefix` ⚡ | Point après le préfixe (`INT.`, pas `INT` ni `INT-`) | info |
 | `scene-time` | Présence du moment (JOUR/NUIT…) en fin d'intitulé | info |
 | `scene-time-order` ⚡ | Moment mal placé (`INT. JOUR - LIEU`) — déplacé en fin d'intitulé | info |
 | `scene-sep` ⚡ | Moment séparé par un tiret (`- JOUR`) | info |
@@ -200,6 +204,7 @@ donc au cas par cas.
 | `scene-empty` | Séquence sans aucun contenu | avertissement |
 | `char-variant` ⚡✋ | Même personnage orthographié différemment — renommage partout en un clic | avertissement |
 | `char-near` ⚡✋ | Deux noms à une lettre d'écart — renommage partout en un clic | avertissement |
+| `char-paren` ⚡ | Indication de jeu sur la ligne du nom — passée sur sa propre ligne en didascalie | avertissement |
 | `char-blank` | Ligne seule en MAJUSCULES traitée comme action (réplique oubliée ?) | info |
 | `paren-style` ⚡ | Didascalie en minuscules, sans point final | info |
 | `paren-close` ⚡ | Parenthèse refermée | avertissement |

@@ -50,6 +50,9 @@ export function parseScript(source: string): ParsedLine[] {
     // Intitulé de séquence.
     if (REGEX.scene.test(t)) { inDialogue = false; push('scene'); continue }
 
+    // Carton de fin : centré, même collé à la dernière réplique.
+    if (REGEX.end.test(t)) { inDialogue = false; push('centered'); continue }
+
     // Bloc de dialogue en cours.
     if (inDialogue) {
       if (t.startsWith('(')) { push('parenthetical'); continue }

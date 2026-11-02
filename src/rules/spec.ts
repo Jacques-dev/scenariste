@@ -69,13 +69,17 @@ export const SCENE_TIMES = [
 
 export const REGEX = {
   /** Intitulé de séquence : INT./EXT./I/E/SÉQ, numéro de séquence optionnel devant. */
-  scene: /^(?:\d+[.)]?\s+)?(?:INT(ÉRIEUR)?|EXT(ÉRIEUR)?|I\/E|INT\.?\s*\/\s*EXT|EXT\.?\s*\/\s*INT|SÉQ|SEQ)[\s.:/]/i,
+  scene: /^(?:\d+[.)]?\s+)?(?:INT(ÉRIEUR)?|EXT(ÉRIEUR)?|I\/E|INT\.?\s*\/\s*EXT|EXT\.?\s*\/\s*INT|SÉQ|SEQ)[\s.:/\-–—]/i,
   /** Transitions connues (le test de casse est fait à part). */
-  transitionWord: /^(FADE (IN|OUT|TO)|FONDU( (AU|ENCHAÎNÉ|NOIR|BLANC))*( :)?|CUT TO|SMASH CUT( TO)?|MATCH CUT( TO)?|DISSOLVE TO|OUVERTURE EN FONDU|FIN)\b/i,
+  transitionWord: /^(FADE (IN|OUT|TO)|FONDU( (AU|ENCHAÎNÉ|NOIR|BLANC))*( :)?|CUT TO|SMASH CUT( TO)?|MATCH CUT( TO)?|DISSOLVE TO|OUVERTURE EN FONDU)\b/i,
+  /** Carton de fin, centré : « FIN », « THE END ». */
+  end: /^(FIN|THE END)\.?$/,
   /** Clé de bloc titre en tête de document : « Titre: … ». */
   titleKey: /^(titre|title|auteur(s)?|author(s)?|écrit par|written by|credit|crédit|contact|date|source|copyright|version|draft( date)?)\s*:/i,
   /** Extension de personnage : (V.O.), (OFF), (SUITE)… */
   charExtension: /\(([^)]*)\)\s*$/,
+  /** Extensions reconnues sur la ligne du personnage ; tout le reste est une didascalie. */
+  knownExtension: /^(V\.?\s?O\.?|VOIX OFF|O\.?\s?S\.?|O\.?\s?C\.?|OFF|H\.?\s?C\.?|HORS CHAMP|SUITE|CONT'D|CONT\.?|V\.?\s?F\.?|PRE-LAP|PRÉ-LAP|AU TÉLÉPHONE|TÉLÉPHONE|FILTRÉ|SUR L'ÉCRAN)$/i,
   /** Moment en fin d'intitulé. */
   sceneTime: new RegExp(`[-–—]\\s*(${SCENE_TIMES.join('|')})\\s*$`, 'i'),
 }

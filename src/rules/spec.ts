@@ -1,7 +1,7 @@
 // Spécification machine des règles de formatage d'un scénario professionnel.
 // Référence détaillée : docs/REGLES_FORMATAGE.md
 // Unités : les retraits et largeurs sont en caractères Courier 12 pt (1 car. = 0,1 po),
-// mesurés depuis la marge gauche du texte (elle-même à 1,5 po du bord de page).
+// mesurés depuis la marge gauche du texte (elle-même à 1,25 po du bord de page).
 
 export type ElType =
   | 'scene'
@@ -33,8 +33,9 @@ export const PAGE = {
   paper: 'letter' as const,
   marginTopIn: 1,
   marginBottomIn: 1,
-  marginLeftIn: 1.5,
-  marginRightIn: 1,
+  // Marges latérales égales : le bloc de texte (6 po) est centré sur la page.
+  marginLeftIn: 1.25,
+  marginRightIn: 1.25,
   /** Largeur utile du texte : 6 po à 10 car./po. */
   contentWidthCh: 60,
   /** ≈ 55 lignes de texte par page (6 lignes/po). */
@@ -63,9 +64,13 @@ export const LABELS = {
 
 /** Moments acceptés en fin d'intitulé de séquence. */
 export const SCENE_TIMES = [
-  'JOUR', 'NUIT', 'AUBE', 'CRÉPUSCULE', 'MATIN', 'SOIR', 'CONTINU', 'PLUS TARD',
-  'MÊME HEURE', 'DAY', 'NIGHT', 'DAWN', 'DUSK', 'MORNING', 'EVENING', 'CONTINUOUS', 'LATER',
-]
+  'JOUR', 'NUIT', 'AUBE', 'CRÉPUSCULE', 'MATIN', 'MATINÉE', 'MIDI', 'APRÈS-MIDI', 'SOIR',
+  'SOIRÉE', 'CONTINU', 'CONTINUITÉ', 'PLUS TARD', 'PLUS TÔT', 'MÊME HEURE', 'MÊME MOMENT',
+  'DAY', 'NIGHT', 'DAWN', 'DUSK', 'MORNING', 'AFTERNOON', 'EVENING', 'CONTINUOUS', 'LATER',
+].sort((a, b) => b.length - a.length) // « APRÈS-MIDI » avant « MIDI » dans les alternatives
+
+/** Un moment (mot entier, accents compris). */
+const TIME_WORD = `(?<![\\p{L}])(?:${SCENE_TIMES.join('|')})(?![\\p{L}])`
 
 export const REGEX = {
   /** Intitulé de séquence : INT./EXT./I/E/SÉQ, numéro de séquence optionnel devant. */
@@ -76,8 +81,13 @@ export const REGEX = {
   titleKey: /^(titre|title|auteur(s)?|author(s)?|écrit par|written by|credit|crédit|contact|date|source|copyright|version|draft( date)?)\s*:/i,
   /** Extension de personnage : (V.O.), (OFF), (SUITE)… */
   charExtension: /\(([^)]*)\)\s*$/,
-  /** Moment en fin d'intitulé. */
-  sceneTime: new RegExp(`[-–—]\\s*(${SCENE_TIMES.join('|')})\\s*$`, 'i'),
+  /**
+   * Moment dans le dernier segment de l'intitulé, après un tiret, avec
+   * qualificatifs et précisions entre parenthèses admis :
+   * « - JOUR », « - FIN DE NUIT », « - JOUR ET NUIT (MONTAGE) », « - NUIT (PLUS TÔT) ».
+   * Le tiret d'« APRÈS-MIDI » n'est pas un séparateur (pas d'espace autour).
+   */
+  sceneTime: new RegExp(`(?:\\s[-–—]|[-–—]\\s)(?:(?!\\s[-–—]|[-–—]\\s).)*${TIME_WORD}(?:(?!\\s[-–—]|[-–—]\\s).)*$`, 'iu'),
 }
 
 /** Vrai si la ligne est entièrement en majuscules (accents compris) et contient des lettres. */

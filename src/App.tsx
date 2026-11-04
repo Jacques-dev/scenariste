@@ -66,6 +66,8 @@ const HINTS: Record<string, string> = {
 // vide ou supprimer la ligne si le scénario n'est pas une adaptation.
 const NEW_DOC = 'Titre: \nÉcrit par: \nSource: \n\n'
 
+const GUIDE_KEY = 'scenariste-guide-vu'
+
 function download(filename: string, text: string) {
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
   const a = document.createElement('a')
@@ -84,14 +86,18 @@ export default function App() {
   const [showLint, setShowLint] = useState(() => !window.matchMedia('(max-width: 1100px)').matches)
   const [showScenes, setShowScenes] = useState(() => !window.matchMedia('(max-width: 1100px)').matches)
   const [showExport, setShowExport] = useState(false)
-  // Guide interactif à la première visite (simple marqueur, aucun contenu stocké).
+  // Guide interactif à la première visite seulement (simple marqueur, aucun
+  // contenu stocké). Le marqueur est posé dès l'affichage, pas à la fermeture :
+  // recharger ou quitter la page pendant le guide ne le fait pas revenir.
+  // Le bouton « ? » permet toujours de le revoir.
   const [showGuide, setShowGuide] = useState<boolean>(() => {
-    try { return !localStorage.getItem('scenariste-guide-vu') } catch { return false }
+    try { return !localStorage.getItem(GUIDE_KEY) } catch { return false }
   })
-  const closeGuide = () => {
-    setShowGuide(false)
-    try { localStorage.setItem('scenariste-guide-vu', '1') } catch { /* stockage bloqué */ }
-  }
+  useEffect(() => {
+    if (!showGuide) return
+    try { localStorage.setItem(GUIDE_KEY, '1') } catch { /* stockage bloqué */ }
+  }, [showGuide])
+  const closeGuide = () => setShowGuide(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -160,6 +166,12 @@ export default function App() {
   const goTo = (lineNo: number) => {
     setMode('edit')
     requestAnimationFrame(() => editor.current?.goToLine(lineNo))
+  }
+
+  // Remarque sans correction automatique : on mène à la ligne et on la signale.
+  const goToAndFlash = (lineNo: number) => {
+    setMode('edit')
+    requestAnimationFrame(() => editor.current?.flashLine(lineNo))
   }
 
   const onNew = async () => {
@@ -410,7 +422,7 @@ export default function App() {
               </div>
               <LintPanel
                 issues={issues}
-                onGoTo={goTo}
+                onGoTo={goToAndFlash}
                 onFix={it => { applyFixes([it]); goTo(it.lineNo) }}
                 onFixAll={fixAll}
               />

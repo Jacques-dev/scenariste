@@ -135,6 +135,13 @@ button.ghost { background: none !important; }
 .cm-activeLineGutter { background: rgba(70, 120, 200, .12) !important; color: #555 !important; }
 .cm-placeholder { color: #999 !important; white-space: pre-wrap !important; }
 .cm-ghost { color: #a8a8a8; pointer-events: none; }
+/* Ligne signalée depuis une remarque (1,5 s, voir flashLine dans editor.ts).
+   Ombre intérieure plutôt que background : .cm-activeLine impose le sien. */
+.cm-line.cm-flash { animation: cm-flash 1.5s ease-out forwards; }
+@keyframes cm-flash {
+  0%, 65% { box-shadow: inset 4px 0 0 #2f74e0, inset 0 0 0 9999px rgba(60, 130, 240, .30); }
+  100% { box-shadow: inset 4px 0 0 rgba(47, 116, 224, 0), inset 0 0 0 9999px rgba(60, 130, 240, 0); }
+}
 
 /* Retraits des éléments — doivent refléter src/rules/spec.ts */
 .el-scene      { font-weight: 700; text-transform: uppercase; }
@@ -265,17 +272,16 @@ button.ghost { background: none !important; }
   font-family: 'Courier Prime', Courier, monospace;
   font-size: 12pt; line-height: 12pt;
 }
-.pagenum { position: absolute; top: .5in; right: 1in; }
+.pagenum { position: absolute; top: .5in; right: 1.25in; }
 .page-body {
-  position: absolute; top: 1in; left: 1.5in; right: 1in; bottom: .5in;
+  position: absolute; top: 1in; left: 1.25in; right: 1.25in; bottom: .5in;
   overflow: hidden;
 }
 .pl { white-space: pre-wrap; min-height: 12pt; }
 .pl-scene { font-weight: 700; }
 .pl-more { }
 
-/* page de titre : centrée sur la page entière (pas sur la zone de texte,
-   dont la marge de reliure est plus large à gauche) */
+/* page de titre : centrée sur la page entière */
 .title-page .title-main {
   position: absolute; top: 3.3in; left: 1in; right: 1in; text-align: center;
 }
@@ -284,7 +290,7 @@ button.ghost { background: none !important; }
 .tp-author { margin-bottom: 24pt; }
 /* La source s'affiche plus bas sur la page de titre, centrée. */
 .tp-source { position: absolute; bottom: 2.5in; left: 1in; right: 1in; text-align: center; }
-.tp-contact { position: absolute; bottom: 1in; left: 1.5in; }
+.tp-contact { position: absolute; bottom: 1in; left: 1.25in; }
 
 /* ---------- règles ---------- */
 .rules-panel {

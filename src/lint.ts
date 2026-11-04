@@ -1,4 +1,5 @@
 import { ParsedLine } from './parser'
+import { wrap } from './paginate'
 import { ELEMENTS, REGEX, SCENE_TIMES, isUpperLine } from './rules/spec'
 
 export type Severity = 'warn' | 'info'
@@ -25,10 +26,14 @@ const upper = (s: string) => s.toLocaleUpperCase('fr-FR')
 const deaccent = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '')
 const normName = (s: string) => deaccent(upper(s)).replace(/\s+/g, ' ').trim()
 
-/** Moment en fin de ligne, sans exiger le tiret. */
-const TIME_END = new RegExp(`\\s+(${SCENE_TIMES.join('|')})\\s*$`, 'i')
+const TIMES = SCENE_TIMES.join('|')
+/** Moment en fin de ligne sans tiret, précisions entre parenthèses admises. */
+const TIME_END = new RegExp(`\\s+(${TIMES})((?:\\s*\\([^)]*\\))*)\\s*$`, 'iu')
 /** Moment n'importe où dans la ligne (mot entier, accents compris). */
-const TIME_ANY = new RegExp(`(?<![\\p{L}])(${SCENE_TIMES.join('|')})(?![\\p{L}])`, 'iu')
+const TIME_ANY = new RegExp(`(?<![\\p{L}])(${TIMES})(?![\\p{L}])`, 'iu')
+/** Point final d'un intitulé (pas les points de suspension). */
+const SCENE_PERIOD = /(?<!\.)\.\s*$/
+const stripPeriod = (s: string) => s.replace(SCENE_PERIOD, '')
 /** INT/EXT sans point ni slash derrière. */
 const PREFIX_NO_DOT = /^(int|ext)(?=\s)/i
 
@@ -88,12 +93,34 @@ export function numberToFrench(n: number): string {
   if (n < 1000) return below1000(n)
   const k = Math.floor(n / 1000)
   const r = n % 1000
-  const mille = k === 1 ? 'mille' : `${below1000(k)} mille`
+  // « cent » et « vingt » perdent leur s devant « mille » : deux cent mille.
+  const mille = k === 1 ? 'mille' : `${below1000(k).replace(/(cent|vingt)s$/, '$1')} mille`
   return r === 0 ? mille : `${mille} ${below1000(r)}`
 }
 
-/** Nombres isolés uniquement : « 15 heures » oui, « 15h » ou « A4 » non. */
-const LONE_NUMBER = /(?<![\p{L}\d])\d{1,6}(?![\p{L}\d])/gu
+/**
+ * Nombres isolés uniquement : « 15 heures », « 30 000 » (milliers séparés par une
+ * espace) oui ; « 15h », « A4 » ou les décimaux « 3,5 » non.
+ */
+const LONE_NUMBER = /(?<![\p{L}\d]|\d[,.])(?:\d{1,3}(?:[ \u00A0\u202F]\d{3})(?![\d])|\d{1,6})(?![\p{L}\d]|[,.]\d)(\s*[€%])?/gu
+const hasLoneNumber = (s: string) => s.search(LONE_NUMBER) >= 0
+const numbersToWords = (s: string) =>
+  s.replace(LONE_NUMBER, (m, unit?: string) => {
+    const words = numberToFrench(parseInt(m.replace(/\D/g, ''), 10))
+    if (!unit) return words
+    return `${words} ${unit.trim() === '€' ? 'euros' : 'pour cent'}`
+  })
+
+/** Ligne de bloc titre : « Clé: valeur ». */
+const titleValue = (parsed: ParsedLine[], key: RegExp) => {
+  const l = parsed.find(p => p.type === 'title' && key.test(p.text))
+  return l ? { line: l, value: l.text.replace(/^[^:]*:/, '').trim() } : null
+}
+
+/** Didascalie collée à la réplique : « (un temps)Bon. » */
+const PAREN_INLINE = /^(\s*\([^)]*\))\s*(\S.*)$/
+/** Emphase façon Markdown/Fountain : **gras**, *italique*. */
+const EMPHASIS = /\*{1,3}(?=\S)([^*]*?\S)\*{1,3}/g
 
 /** Réécrit le nom d'une ligne de personnage en conservant @ et l'extension (V.O.)… */
 function renameCue(main: string) {
@@ -118,7 +145,13 @@ export function lint(parsed: ParsedLine[]): Issue[] {
   let actionRunStart = -1
   let dialogueRun = 0
   let dialogueRunStart = -1
-  let lastDigitsLine = -10
+
+  // Noms de personnages connus (formes normalisées), pour les règles qui en ont besoin.
+  const charNames = new Set(
+    parsed.filter(p => p.type === 'character')
+      .map(p => normName(p.text.replace(REGEX.charExtension, '')))
+      .filter(Boolean),
+  )
 
   // Noms de personnages : variantes regroupées par forme normalisée.
   const charGroups = new Map<string, Map<string, { count: number; firstLine: number; lines: number[] }>>()
@@ -141,12 +174,13 @@ export function lint(parsed: ParsedLine[]): Issue[] {
 
     if (p.type === 'action') {
       if (actionRun === 0) actionRunStart = p.lineNo
-      actionRun++
+      // Lignes réellement imprimées (une ligne de l'éditeur peut en faire plusieurs).
+      actionRun += wrap(p.text, ELEMENTS.action.widthCh).length
     } else if (actionRun > 0 && p.type === 'blank') { flushRuns() }
 
     if (p.type === 'dialogue') {
       if (dialogueRun === 0) dialogueRunStart = p.lineNo
-      dialogueRun += Math.max(1, Math.ceil(p.text.length / ELEMENTS.dialogue.widthCh))
+      dialogueRun += wrap(p.text, ELEMENTS.dialogue.widthCh).length
     } else if (dialogueRun > 0 && p.type !== 'parenthetical') { flushRuns() }
 
     // Doubles espaces (hors bloc titre et lignes vides).
@@ -155,6 +189,15 @@ export function lint(parsed: ParsedLine[]): Issue[] {
         label: 'Corriger',
         apply: line => line.replace(/(\S) {2,}(?=\S)/g, '$1 '),
       })
+
+    // Ni gras ni italique dans un scénario (§1) : reliquat de traitement de texte.
+    EMPHASIS.lastIndex = 0
+    if (p.type !== 'blank' && p.type !== 'title' && EMPHASIS.test(p.text))
+      add(p.lineNo, 'emphasis', 'info',
+        'Pas de gras ni d\'italique dans un scénario : les astérisques seront imprimés tels quels.', {
+          label: 'Retirer les astérisques',
+          apply: line => line.replace(EMPHASIS, '$1'),
+        })
 
     switch (p.type) {
       case 'scene': {
@@ -170,24 +213,28 @@ export function lint(parsed: ParsedLine[]): Issue[] {
               label: 'Ajouter le point',
               apply: line => line.replace(/^(\s*)(int|ext)(?=\s)/i, (_m, a, b) => a + upper(b) + '.'),
             })
-        const hasDashTime = REGEX.sceneTime.test(p.text)
-        const hasEndTime = TIME_END.test(p.text)
+        // Le point final éventuel est signalé à part (scene-period) : on
+        // l'ignore ici pour ne pas fausser la détection du moment.
+        const head = stripPeriod(p.text)
+        const hasDashTime = REGEX.sceneTime.test(head)
+        const hasEndTime = TIME_END.test(head)
         if (!hasDashTime && hasEndTime)
           add(p.lineNo, 'scene-sep', 'info',
             'Séparez le moment par un tiret : « - JOUR ».', {
               label: 'Ajouter le tiret',
-              apply: line => line.replace(TIME_END, (_m, t) => ` - ${upper(t)}`),
+              apply: line => stripPeriod(line).replace(TIME_END, (_m, t, paren) => ` - ${upper(t)}${paren}`),
             })
         if (!hasDashTime && !hasEndTime) {
-          const misplaced = TIME_ANY.exec(p.text)
+          const misplaced = TIME_ANY.exec(head)
           if (misplaced)
             add(p.lineNo, 'scene-time-order', 'info',
               `Le moment se place en fin d'intitulé : « INT. LIEU - ${upper(misplaced[1])} ».`, {
                 label: 'Déplacer à la fin',
                 apply: line => {
-                  const m = TIME_ANY.exec(line)
+                  const src = stripPeriod(line)
+                  const m = TIME_ANY.exec(src)
                   if (!m) return line
-                  let rest = line.slice(0, m.index) + line.slice(m.index + m[0].length)
+                  let rest = src.slice(0, m.index) + src.slice(m.index + m[0].length)
                   rest = rest
                     .replace(/\s*[-–—]\s*[-–—]\s*/g, ' - ') // tirets doublés
                     .replace(/([.:])\s*[-–—]\s*/, '$1 ')    // tiret collé au préfixe
@@ -201,11 +248,11 @@ export function lint(parsed: ParsedLine[]): Issue[] {
             add(p.lineNo, 'scene-time', 'info',
               'Terminez l\'intitulé par le moment : « INT. MAISON DE CAMPAGNE - JOUR ».')
         }
-        if (/\.$/.test(p.text))
+        if (SCENE_PERIOD.test(p.text))
           add(p.lineNo, 'scene-period', 'info',
             'Pas de point final dans un intitulé de séquence.', {
               label: 'Retirer le point',
-              apply: line => line.replace(/\.\s*$/, ''),
+              apply: stripPeriod,
             })
         const after = nextNonBlank(parsed, i)
         if (!after || after.type === 'scene' || after.type === 'transition')
@@ -226,18 +273,41 @@ export function lint(parsed: ParsedLine[]): Issue[] {
         break
       }
       case 'parenthetical': {
+        // Didascalie et réplique sur la même ligne : on les sépare d'abord, les
+        // autres vérifications porteront ensuite sur la didascalie seule.
+        const inline = PAREN_INLINE.exec(p.text)
+        if (inline) {
+          add(p.lineNo, 'paren-inline', 'warn',
+            'Didascalie et réplique sur la même ligne : la réplique va à la ligne suivante.', {
+              label: 'Séparer',
+              apply: line => line.replace(PAREN_INLINE, '$1\n$2'),
+            })
+          break
+        }
         const inner = p.text.replace(/^\(|\)$/g, '').trim()
-        if (/^\p{Lu}/u.test(inner) || /[.]\)?\s*$/.test(p.text))
+        // Majuscule initiale admise devant un nom de personnage (« (à Paul) » non,
+        // « (Paul se lève) » oui) ou un sigle.
+        const firstWord = /^[\p{L}'’.]+/u.exec(inner)?.[0] ?? ''
+        const capOk = charNames.has(normName(firstWord)) || (firstWord.length > 1 && isUpperLine(firstWord))
+        const badCap = /^\p{Lu}/u.test(inner) && !capOk
+        // Point final, mais pas les points de suspension.
+        const badPeriod = /(?<!\.)\.\s*\)?\s*$/.test(p.text)
+        if (badCap || badPeriod)
           add(p.lineNo, 'paren-style', 'info',
-            'Didascalie en minuscules, sans point final : « (un temps) ».', {
+            badCap
+              ? 'Didascalie en minuscules, sans point final : « (un temps) ».'
+              : 'Pas de point final dans une didascalie : « (un temps) ».', {
               label: 'Corriger',
-              apply: line => line
-                .replace(/\(\s*(\p{Lu})/u, m => m.toLocaleLowerCase('fr-FR'))
-                .replace(/\.\s*(\)?)\s*$/, '$1'),
+              apply: line => {
+                let out = line
+                if (badCap) out = out.replace(/\(\s*(\p{Lu})/u, m => m.toLocaleLowerCase('fr-FR'))
+                if (badPeriod) out = out.replace(/(?<!\.)\.\s*(\)?)\s*$/, '$1')
+                return out
+              },
             })
         if (inner.length > ELEMENTS.parenthetical.widthCh * 2)
           add(p.lineNo, 'paren-long', 'info',
-            "Didascalie trop longue : si elle dépasse une ligne, écrivez-la en action.")
+            'Didascalie de plus de deux lignes : écrivez-la plutôt en action.')
         if (!/\)\s*$/.test(p.text))
           add(p.lineNo, 'paren-close', 'warn', 'Parenthèse non refermée.', {
             label: 'Fermer',
@@ -258,23 +328,34 @@ export function lint(parsed: ParsedLine[]): Issue[] {
         break
       }
       case 'dialogue': {
-        if (LONE_NUMBER.test(p.text) && p.lineNo > lastDigitsLine + 1) {
+        if (hasLoneNumber(p.text))
           add(p.lineNo, 'dialogue-digits', 'info',
             'Dans un dialogue, les nombres s\'écrivent en toutes lettres (« dix-sept », pas « 17 »).', {
               label: 'Écrire en lettres',
-              apply: line => line.replace(LONE_NUMBER, m => numberToFrench(parseInt(m, 10))),
+              apply: numbersToWords,
             })
-        }
-        LONE_NUMBER.lastIndex = 0
-        if (/\d/.test(p.text)) lastDigitsLine = p.lineNo
         break
       }
       case 'transition': {
-        if (!/:$/.test(p.text) && !/^(FADE OUT|FIN)\b/i.test(p.text))
+        // « MARC : » suivi directement d'une réplique : un nom de personnage
+        // écrit à la manière théâtrale, pris pour une transition.
+        if (/:$/.test(p.text) && !REGEX.transitionWord.test(p.text) && next && next.type !== 'blank') {
+          add(p.lineNo, 'char-colon', 'warn',
+            'Pas de deux-points après le nom du personnage : « MARC », réplique dessous.', {
+              label: 'Retirer « : »',
+              apply: line => line.replace(/^(\s*)>?\s*/, '$1').replace(/\s*:\s*$/, ''),
+            })
+          break
+        }
+        // Mot de fin (« FIN. », « FADE OUT. », « FONDU AU NOIR. ») admis en
+        // dernière ligne du script, avec son point.
+        const isLast = !nextNonBlank(parsed, i)
+        const ending = /^(FADE OUT|FONDU AU (NOIR|BLANC)|FIN)\b/i.test(p.text)
+        if (!/:$/.test(p.text) && !(ending && (isLast || /^FIN\b/i.test(p.text))))
           add(p.lineNo, 'transition-colon', 'info',
             'Une transition se termine par deux-points : « CUT TO: », « FONDU AU NOIR : ».', {
               label: 'Ajouter « : »',
-              apply: line => line.replace(/\s*$/, /FONDU|OUVERTURE|COUPE/i.test(line) ? ' :' : ':'),
+              apply: line => line.replace(/\s*\.?\s*$/, /FONDU|OUVERTURE|COUPE/i.test(line) ? ' :' : ':'),
             })
         break
       }
@@ -285,7 +366,8 @@ export function lint(parsed: ParsedLine[]): Issue[] {
         if (/\b(nous voyons|on voit|we see)\b/i.test(p.text))
           add(p.lineNo, 'action-we-see', 'info',
             'Décrivez directement l\'image : « nous voyons / on voit » est implicite.')
-        if (/\b(la caméra|travelling|panoramique|zoom (avant|arrière)|gros plan sur)\b/i.test(p.text))
+        // « la caméra suit… » oui ; « la caméra de surveillance » (un objet du décor) non.
+        if (/\b(la caméra(?!\s+(de|du|des)\s)|travelling|panoramique|zoom (avant|arrière)|gros plan sur)/i.test(p.text))
           add(p.lineNo, 'action-camera', 'info',
             'Indication de caméra : à réserver aux nécessités dramatiques (c\'est le travail du réalisateur).')
         const prevBlank = !prev || prev.type === 'blank'
@@ -322,6 +404,8 @@ export function lint(parsed: ParsedLine[]): Issue[] {
   for (let a = 0; a < keys.length; a++) {
     for (let b = a + 1; b < keys.length; b++) {
       if (!near(keys[a], keys[b])) continue
+      // POLICIER 1 / POLICIER 2 : deux personnages distincts, pas une faute.
+      if (/\d/.test(keys[a] + keys[b]) && keys[a].replace(/\d+/g, '') === keys[b].replace(/\d+/g, '')) continue
       // On propose de renommer le moins fréquent vers le plus fréquent.
       const [keep, drop] = total(keys[a]) >= total(keys[b]) ? [keys[a], keys[b]] : [keys[b], keys[a]]
       const keepName = [...charGroups.get(keep)!.keys()][0]
@@ -334,6 +418,36 @@ export function lint(parsed: ParsedLine[]): Issue[] {
           lines: allLines(drop),
         })
     }
+  }
+
+  // Première apparition d'un personnage dans l'action : nom en MAJUSCULES (§3.2).
+  // On ne regarde que la toute première mention, et seulement si elle précède
+  // sa première réplique (sinon le personnage a été présenté autrement).
+  for (const variants of charGroups.values()) {
+    const [name, info] = [...variants.entries()].sort((a, b) => a[1].firstLine - b[1].firstLine)[0]
+    if (name.length < 2) continue
+    const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')
+    const re = new RegExp(`(?<![\\p{L}'’])${esc}(?![\\p{L}])`, 'iu')
+    const first = parsed.find(l => l.type === 'action' && l.lineNo < info.firstLine && re.test(l.text))
+    if (!first) continue
+    const m = re.exec(first.text)!
+    if (isUpperLine(m[0])) continue
+    add(first.lineNo, 'char-intro-caps', 'info',
+      `Première apparition de ${name} : son nom s'écrit en MAJUSCULES dans l'action.`, {
+        label: `Écrire « ${upper(m[0])} »`,
+        apply: line => line.replace(re, x => upper(x)),
+      })
+  }
+
+  // Page de titre : les deux mentions obligatoires (§4), signalées seulement
+  // une fois le scénario commencé.
+  if (parsed.some(p => p.type !== 'title' && p.type !== 'blank')) {
+    const t = titleValue(parsed, /^(titre|title)\s*:/i)
+    if (t && !t.value)
+      add(t.line.lineNo, 'title-empty', 'info', 'Page de titre : indiquez le titre du scénario.')
+    const a = titleValue(parsed, /^(écrit par|written by|auteurs?|authors?)\s*:/i)
+    if (a && !a.value)
+      add(a.line.lineNo, 'title-empty', 'info', 'Page de titre : indiquez le nom de l\'auteur.')
   }
 
   return issues.sort((a, b) => a.lineNo - b.lineNo)

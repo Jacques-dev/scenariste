@@ -166,6 +166,11 @@ button.ghost { background: none !important; }
 /* Seules les remarques corrigeables réagissent au survol (en vert). */
 .lint-item.fixable { cursor: pointer; }
 .lint-item.fixable:hover { background: #2d3a2e; }
+/* Remarque sélectionnée (premier clic) : un second clic applique la correction. */
+.lint-item.selected { background: #2a3140; box-shadow: inset 2px 0 0 #7da7e0; }
+.lint-item.fixable.selected { background: #2d3a2e; box-shadow: inset 2px 0 0 #8fce91; }
+.lint-body { display: flex; flex-direction: column; gap: 3px; }
+.lint-hint { color: #8fce91; font-size: 11.5px; }
 .lint-line { color: #7da7e0; min-width: 38px; font-variant-numeric: tabular-nums; }
 .sev-warn .lint-sev { color: #e8b84b; }
 .sev-info .lint-sev { color: #7da7e0; }

@@ -181,8 +181,12 @@ function unshout(s: string, names: Set<string>): string {
     const capsWords = sentence.match(/[\p{L}'’-]+/gu)?.filter(w => w === upper(w) && /\p{L}/u.test(w)) ?? []
     const capsLetters = capsWords.join('').replace(/\P{L}/gu, '').length
     if (letters === 0 || capsLetters / letters < 0.5) return sentence
-    return sentence.replace(/[\p{L}'’-]+/gu, w =>
-      w !== upper(w) ? w : names.has(normName(w)) ? titleCase(w) : lower(w))
+    return sentence.replace(/[\p{L}'’-]+/gu, w => {
+      if (w !== upper(w)) return w
+      // Élision : « D'ARTHUR » → « d'Arthur ».
+      const [, elided = '', word] = /^(\p{L}{1,3}['’])?(.*)$/u.exec(w)!
+      return lower(elided) + (names.has(normName(word)) ? titleCase(word) : lower(word))
+    })
   }).join('')
   // Après « : », la phrase commence en minuscule ; ensuite, majuscule après . ! ? …
   return out.replace(/([.!?…]\s+)(\p{Ll})/gu, (_m, a, b) => a + upper(b))

@@ -46,6 +46,12 @@ const TEMPLATES: { label: string; tip: string; snippet: string; sel: [number, nu
     snippet: '> TEXTE <',
     sel: [2, 7],
   },
+  {
+    label: '+ Montage',
+    tip: 'Montage : une suite de plans courts, un par paragraphe (« - Lieu, moment : action »), fermée par FIN DU MONTAGE',
+    snippet: 'MONTAGE\n\n- Lieu, moment : action\n\nFIN DU MONTAGE',
+    sel: [11, 32],
+  },
 ]
 
 /** Astuce affichée selon l'élément sous le curseur. */

@@ -216,20 +216,38 @@ export default function App() {
   const applyFixes = (toFix: Issue[]) => {
     const view = editor.current?.view
     if (!view) return
+    const doc = view.state.doc
     const byLine = new Map<number, Issue[]>()
+    const blocks: { from: number; to: number; insert: string }[] = []
     for (const it of toFix) {
       if (!it.fix) continue
       for (const ln of it.fix.lines ?? [it.lineNo]) {
-        if (ln + 1 > view.state.doc.lines) continue
-        byLine.set(ln, [...(byLine.get(ln) ?? []), it])
+        if (ln + 1 > doc.lines) continue
+        if (it.fix.span && it.fix.span > 1) {
+          // Correction sur plusieurs lignes : appliquée seule sur son bloc.
+          const last = Math.min(doc.lines, ln + it.fix.span)
+          const from = doc.line(ln + 1).from
+          const to = doc.line(last).to
+          const before = doc.sliceString(from, to)
+          const insert = it.fix.apply(before)
+          if (insert !== before) blocks.push({ from, to, insert })
+        } else {
+          byLine.set(ln, [...(byLine.get(ln) ?? []), it])
+        }
       }
     }
-    const changes = [...byLine.entries()].flatMap(([lineNo, its]) => {
-      const line = view.state.doc.line(lineNo + 1)
+    const lineChanges = [...byLine.entries()].flatMap(([lineNo, its]) => {
+      const line = doc.line(lineNo + 1)
       let text = line.text
       for (const it of its) text = it.fix!.apply(text)
       return text === line.text ? [] : [{ from: line.from, to: line.to, insert: text }]
     })
+    // Les blocs priment ; une modification qui chevauche un bloc attend la passe suivante.
+    const changes: typeof blocks = []
+    for (const c of [...blocks, ...lineChanges]) {
+      if (!changes.some(d => c.from <= d.to && d.from <= c.to)) changes.push(c)
+    }
+    changes.sort((a, b) => a.from - b.from)
     if (changes.length) view.dispatch({ changes })
   }
 

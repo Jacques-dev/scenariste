@@ -69,7 +69,9 @@ Structure : `INT./EXT. LIEU - MOMENT`
   `INT. HÔPITAL - COULOIR DES URGENCES - NUIT`.
 - Le **moment** termine l'intitulé : `JOUR`, `NUIT`, `AUBE`, `CRÉPUSCULE`, `MATIN`, `SOIR`,
   ou pour la continuité : `CONTINU`, `PLUS TARD`, `MÊME HEURE` (`DAY`, `NIGHT`,
-  `CONTINUOUS`, `LATER` en anglais).
+  `CONTINUOUS`, `LATER` en anglais). Il peut être qualifié (`FIN DE NUIT`, `JOUR ET NUIT`)
+  et suivi d'une précision entre parenthèses : `INT. HANGAR - JOUR (PRÉSENT)`,
+  `EXT. RUELLE - NUIT (QUELQUES HEURES PLUS TÔT)`.
 - Jamais de point final ; pas de mise en scène dans l'intitulé.
 - La numérotation des séquences dans les deux marges (`12 … 12`) est réservée aux
   **versions de tournage** (shooting script), pas aux versions de lecture.
@@ -100,6 +102,9 @@ Structure : `INT./EXT. LIEU - MOMENT`
     en France : `(OFF)` ;
   - `(SUITE)` / `(CONT'D)` — même personnage qui reprend la parole après une action, ou
     dialogue repris après un saut de page.
+- **Seules ces extensions** vont sur la ligne du nom. Une indication de jeu
+  (`(d'un ton menaçant)`, `(à Marie)`) n'y a pas sa place : c'est une didascalie, sur sa
+  propre ligne entre le nom et la réplique, en minuscules.
 - Personnages non nommés : fonction en majuscules (`LE SERVEUR`, `POLICIER 1`).
 
 ### 3.4 Didascalie (*parenthetical* / « parenthèse »)
@@ -125,7 +130,8 @@ Structure : `INT./EXT. LIEU - MOMENT`
 - Alignées à **droite**, MAJUSCULES, terminées par deux-points : `CUT TO:`, `DISSOLVE TO:`,
   `SMASH CUT TO:` ; en France : `FONDU AU NOIR :`, `FONDU ENCHAÎNÉ :`.
 - Exceptions alignées à **gauche** : `FADE IN:` (`OUVERTURE EN FONDU :`) en tout début de
-  script ; `FADE OUT.` / `FIN` en toute fin.
+  script ; `FADE OUT.` en toute fin.
+- `FIN` n'est pas une transition mais un carton **centré** (voir 3.7).
 - Le *cut* étant implicite entre deux séquences, les transitions explicites sont rares dans
   une version de lecture.
 
@@ -198,25 +204,30 @@ donc au cas par cas.
 | Code | Vérification | Sévérité |
 |---|---|---|
 | `scene-caps` ⚡ | Intitulé de séquence entièrement en majuscules | avertissement |
-| `scene-prefix` ⚡ | Point après le préfixe (`INT.`, pas `INT`) | info |
+| `scene-prefix` ⚡ | Point après le préfixe (`INT.`, pas `INT` ni `INT-`) | info |
 | `scene-time` | Présence du moment (JOUR/NUIT…) en fin d'intitulé — qualificatifs (`FIN DE NUIT`, `JOUR ET NUIT`) et précisions entre parenthèses (`- NUIT (PLUS TÔT)`) admis | info |
 | `scene-time-order` ⚡ | Moment mal placé (`INT. JOUR - LIEU`) — déplacé en fin d'intitulé | info |
 | `scene-sep` ⚡ | Moment séparé par un tiret (`- JOUR`) | info |
-| `scene-period` ⚡ | Pas de point final dans l'intitulé (points de suspension admis) | info |
+| `scene-period` ⚡ | Pas de point final dans l'intitulé | info |
 | `scene-empty` | Séquence sans aucun contenu | avertissement |
+| `scene-inline` | Intitulé et action sur la même ligne (`1. INT. LIEU - NUIT : Arthur…`) — format de montage à revoir | info |
 | `char-variant` ⚡✋ | Même personnage orthographié différemment — renommage partout en un clic | avertissement |
 | `char-near` ⚡✋ | Deux noms à une lettre d'écart — renommage partout en un clic | avertissement |
+| `char-paren` ⚡ | Indication de jeu sur la ligne du nom — passée sur sa propre ligne en didascalie | avertissement |
 | `char-blank` | Ligne seule en MAJUSCULES traitée comme action (réplique oubliée ?) | info |
 | `char-colon` ⚡ | Nom de personnage suivi de deux-points (`MARC :`), à la manière théâtrale | avertissement |
-| `char-intro-caps` ⚡ | Première apparition d'un personnage dans l'action en MAJUSCULES (§3.2) | info |
+| `char-intro` ⚡ | Première apparition d'un personnage dans l'action en MAJUSCULES | info |
+| `char-caps` ⚡✋ | Nom resté en MAJUSCULES dans l'action après sa présentation | info |
 | `paren-inline` ⚡ | Didascalie et réplique sur la même ligne — séparées | avertissement |
-| `paren-style` ⚡ | Didascalie en minuscules (sauf nom de personnage), sans point final | info |
+| `paren-style` ⚡ | Didascalie en minuscules (sauf nom de personnage), sans point final (points de suspension admis) | info |
 | `paren-close` ⚡ | Parenthèse refermée | avertissement |
-| `paren-orphan` | Didascalie hors d'un bloc de dialogue | avertissement |
+| `paren-ext` ⚡ | `(SUITE)`, `(OFF)`… seuls sous le nom — remontés sur la ligne du personnage | avertissement |
+| `paren-orphan` ⚡ | Didascalie hors d'un bloc de dialogue ; sous un intitulé, intégrée à l'intitulé | avertissement |
+| `dialogue-action` ⚡✋ | Action collée sous une réplique sans ligne vide (imprimée comme du dialogue) | avertissement |
 | `paren-end` ⚡✋ | Didascalie qui termine une réplique — transformation en action | avertissement |
 | `paren-long` | Didascalie de plus de deux lignes (devrait être de l'action) | info |
 | `dialogue-digits` ⚡ | Nombres convertis en toutes lettres (« 71 » → « soixante et onze », « 30 000 € » → « trente mille euros ») ; heures `14h`, références `A4` et décimaux laissés tels quels | info |
-| `transition-colon` ⚡ | Transition terminée par `:` (`FIN.`, `FONDU AU NOIR.` admis en dernière ligne) | info |
+| `transition-colon` ⚡ | Transition terminée par `:` (`FADE OUT.`, `FONDU AU NOIR.` admis en dernière ligne) | info |
 | `action-we-see` | « nous voyons / on voit » implicite | info |
 | `action-camera` | Indications de caméra à éviter | info |
 | `action-long` | Paragraphe d'action > 6 lignes imprimées | info |

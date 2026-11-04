@@ -69,25 +69,26 @@ export const SCENE_TIMES = [
   'DAY', 'NIGHT', 'DAWN', 'DUSK', 'MORNING', 'AFTERNOON', 'EVENING', 'CONTINUOUS', 'LATER',
 ].sort((a, b) => b.length - a.length) // « APRÈS-MIDI » avant « MIDI » dans les alternatives
 
-/** Un moment (mot entier, accents compris). */
-const TIME_WORD = `(?<![\\p{L}])(?:${SCENE_TIMES.join('|')})(?![\\p{L}])`
-
 export const REGEX = {
   /** Intitulé de séquence : INT./EXT./I/E/SÉQ, numéro de séquence optionnel devant. */
-  scene: /^(?:\d+[.)]?\s+)?(?:INT(ÉRIEUR)?|EXT(ÉRIEUR)?|I\/E|INT\.?\s*\/\s*EXT|EXT\.?\s*\/\s*INT|SÉQ|SEQ)[\s.:/]/i,
+  scene: /^(?:\d+[.)]?\s+)?(?:INT(ÉRIEUR)?|EXT(ÉRIEUR)?|I\/E|INT\.?\s*\/\s*EXT|EXT\.?\s*\/\s*INT|SÉQ|SEQ)[\s.:/\-–—]/i,
   /** Transitions connues (le test de casse est fait à part). */
-  transitionWord: /^(FADE (IN|OUT|TO)|FONDU( (AU|ENCHAÎNÉ|NOIR|BLANC))*( :)?|CUT TO|SMASH CUT( TO)?|MATCH CUT( TO)?|DISSOLVE TO|OUVERTURE EN FONDU|FIN)\b/i,
+  transitionWord: /^(FADE (IN|OUT|TO)|FONDU( (AU|ENCHAÎNÉ|NOIR|BLANC))*( :)?|CUT TO|SMASH CUT( TO)?|MATCH CUT( TO)?|DISSOLVE TO|OUVERTURE EN FONDU)\b/i,
+  /** Carton de fin, centré : « FIN », « THE END ». */
+  end: /^(FIN|THE END)\.?$/,
   /** Clé de bloc titre en tête de document : « Titre: … ». */
   titleKey: /^(titre|title|auteur(s)?|author(s)?|écrit par|written by|credit|crédit|contact|date|source|copyright|version|draft( date)?)\s*:/i,
-  /** Extension de personnage : (V.O.), (OFF), (SUITE)… */
-  charExtension: /\(([^)]*)\)\s*$/,
+  /** Extension(s) de personnage en fin de ligne : (V.O.), (OFF), (H.C.) (SUITE)… — le groupe capture la dernière. */
+  charExtension: /(?:\s*\(([^)]*)\))+\s*$/,
+  /** Extensions reconnues sur la ligne du personnage ; tout le reste est une didascalie. */
+  knownExtension: /^(V\.?\s?O\.?|VOIX OFF|O\.?\s?S\.?|O\.?\s?C\.?|OFF|H\.?\s?C\.?|HORS CHAMP|SUITE|CONT'D|CONT\.?|V\.?\s?F\.?|PRE-LAP|PRÉ-LAP|AU TÉLÉPHONE|TÉLÉPHONE|FILTRÉ|SUR L'ÉCRAN)$/i,
+  /** Moment en fin d'intitulé. */
+  sceneTime: new RegExp(`[-–—]\\s*(${SCENE_TIMES.join('|')})\\s*$`, 'i'),
   /**
-   * Moment dans le dernier segment de l'intitulé, après un tiret, avec
-   * qualificatifs et précisions entre parenthèses admis :
-   * « - JOUR », « - FIN DE NUIT », « - JOUR ET NUIT (MONTAGE) », « - NUIT (PLUS TÔT) ».
-   * Le tiret d'« APRÈS-MIDI » n'est pas un séparateur (pas d'espace autour).
+   * Intitulé et action sur la même ligne (« 1. INT. CHAMBRE - NUIT : Arthur dort. »),
+   * typique d'un élément de montage : traité comme de l'action, pas comme un intitulé.
    */
-  sceneTime: new RegExp(`(?:\\s[-–—]|[-–—]\\s)(?:(?!\\s[-–—]|[-–—]\\s).)*${TIME_WORD}(?:(?!\\s[-–—]|[-–—]\\s).)*$`, 'iu'),
+  sceneInline: new RegExp(`(${SCENE_TIMES.join('|')})\\s*:\\s+\\S+(?:\\s+\\S+){2,}`, 'iu'),
 }
 
 /** Vrai si la ligne est entièrement en majuscules (accents compris) et contient des lettres. */

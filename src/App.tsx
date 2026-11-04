@@ -81,9 +81,23 @@ function download(filename: string, text: string) {
   URL.revokeObjectURL(a.href)
 }
 
+// Brouillon de l'onglet en cours : survit à un rafraîchissement de la page,
+// mais pas à la fermeture de l'onglet (sessionStorage) — une nouvelle visite
+// repart toujours d'un document vierge.
+const DRAFT_KEY = 'scenariste-brouillon'
+interface Draft { doc: string; currentId: string | null; lastSaved: string; line: number }
+function readDraft(): Draft | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY)
+    const d = raw ? JSON.parse(raw) as Draft : null
+    return d && typeof d.doc === 'string' ? d : null
+  } catch { return null }
+}
+const initialDraft = readDraft()
+
 export default function App() {
-  const [doc, setDoc] = useState<string>(NEW_DOC)
-  const [cursorLine, setCursorLine] = useState(0)
+  const [doc, setDoc] = useState<string>(initialDraft?.doc ?? NEW_DOC)
+  const [cursorLine, setCursorLine] = useState(initialDraft?.line ?? 0)
   const [mode, setMode] = useState<Mode>('edit')
   // Sur petit écran, les panneaux latéraux démarrent fermés (rouvrables depuis
   // la barre d'état) et s'affichent par-dessus la page plutôt qu'à côté.
@@ -116,8 +130,8 @@ export default function App() {
   const [saving, setSaving] = useState(false)
   const [savedFlash, setSavedFlash] = useState(false)
   const savedFlashTimer = useRef<number | undefined>(undefined)
-  const [currentId, setCurrentId] = useState<string | null>(null)
-  const lastSavedRef = useRef<string>('')
+  const [currentId, setCurrentId] = useState<string | null>(initialDraft?.currentId ?? null)
+  const lastSavedRef = useRef<string>(initialDraft?.lastSaved ?? '')
 
   const editorHost = useRef<HTMLDivElement>(null)
   const editor = useRef<EditorHandle | null>(null)
@@ -131,10 +145,41 @@ export default function App() {
       setDoc(text)
       setCursorLine(line)
     })
+    // Après un rafraîchissement : on revient à la ligne où l'on était.
+    if (initialDraft && initialDraft.line > 0) {
+      const line = initialDraft.line
+      requestAnimationFrame(() => editor.current?.goToLine(line))
+    }
   }, [])
 
-  // Chaque visite repart d'un document vierge : rien n'est conservé.
-  // On prévient donc avant de quitter si un travail en cours serait perdu.
+  // Sauvegarde du brouillon de l'onglet (légèrement différée pendant la frappe).
+  const cursorLineRef = useRef(cursorLine)
+  cursorLineRef.current = cursorLine
+  const currentIdRef = useRef(currentId)
+  currentIdRef.current = currentId
+  const writeDraft = () => {
+    try {
+      const draft: Draft = {
+        doc: docRef.current,
+        currentId: currentIdRef.current,
+        lastSaved: lastSavedRef.current,
+        line: cursorLineRef.current,
+      }
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    } catch { /* stockage bloqué ou plein : on s'en passe */ }
+  }
+  useEffect(() => {
+    const t = window.setTimeout(writeDraft, 400)
+    return () => window.clearTimeout(t)
+  }, [doc, cursorLine, currentId])
+  useEffect(() => {
+    window.addEventListener('pagehide', writeDraft)
+    return () => window.removeEventListener('pagehide', writeDraft)
+  }, [])
+
+  // Chaque visite repart d'un document vierge (seul un rafraîchissement de
+  // l'onglet retrouve le brouillon). On prévient donc avant de quitter si un
+  // travail en cours risque d'être perdu.
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => {
       const d = docRef.current

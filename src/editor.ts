@@ -2,7 +2,7 @@ import {
   EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate, WidgetType, keymap,
   drawSelection, highlightActiveLine, placeholder, lineNumbers, highlightActiveLineGutter,
 } from '@codemirror/view'
-import { EditorState, RangeSetBuilder } from '@codemirror/state'
+import { EditorState, RangeSetBuilder, StateEffect, StateField } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { parseScript } from './parser'
 import { ElType } from './rules/spec'
@@ -105,10 +105,30 @@ const screenplayHighlight = ViewPlugin.fromClass(
   { decorations: v => v.decorations },
 )
 
+// Surlignage temporaire d'une ligne (remarque du vérificateur sans correction
+// automatique) : posé par flashLine, retiré au bout de FLASH_MS.
+const FLASH_MS = 1500
+const setFlash = StateEffect.define<number | null>()
+const flashMark = Decoration.line({ class: 'cm-flash' })
+const flashField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    deco = deco.map(tr.changes)
+    for (const e of tr.effects) {
+      if (!e.is(setFlash)) continue
+      deco = e.value == null ? Decoration.none : Decoration.set([flashMark.range(e.value)])
+    }
+    return deco
+  },
+  provide: f => EditorView.decorations.from(f),
+})
+
 export interface EditorHandle {
   view: EditorView
   setText(text: string): void
   goToLine(lineNo: number): void
+  /** Va à la ligne et la surligne en bleu pendant 1,5 s. */
+  flashLine(lineNo: number): void
   /**
    * Insère un gabarit d'élément à la position du curseur, précédé d'une ligne
    * vide si nécessaire, et sélectionne la partie à remplir (selStart/selEnd,
@@ -154,6 +174,7 @@ export function createEditor(
         }),
         placeholder('INT. LIEU - JOUR  …puis décrivez l\'action. Un NOM EN MAJUSCULES seul sur sa ligne ouvre un dialogue.'),
         screenplayHighlight,
+        flashField,
         autoUppercase,
         EditorView.updateListener.of(u => {
           if (u.docChanged || u.selectionSet) {
@@ -165,6 +186,8 @@ export function createEditor(
     }),
   })
 
+  let flashTimer: number | undefined
+
   return {
     view,
     setText(text: string) {
@@ -174,6 +197,16 @@ export function createEditor(
       const line = view.state.doc.line(Math.min(lineNo + 1, view.state.doc.lines))
       view.dispatch({ selection: { anchor: line.from }, scrollIntoView: true })
       view.focus()
+    },
+    flashLine(lineNo: number) {
+      const line = view.state.doc.line(Math.min(lineNo + 1, view.state.doc.lines))
+      view.dispatch({
+        selection: { anchor: line.from },
+        effects: [setFlash.of(line.from), EditorView.scrollIntoView(line.from, { y: 'center' })],
+      })
+      view.focus()
+      window.clearTimeout(flashTimer)
+      flashTimer = window.setTimeout(() => view.dispatch({ effects: setFlash.of(null) }), FLASH_MS)
     },
     insertSnippet(snippet: string, selStart: number, selEnd: number) {
       const { state } = view

@@ -13,8 +13,8 @@ export function RulesPanel() {
       <p>
         Standard international (<em>master scene format</em>) : Courier {PAGE.fontSizePt} pt,
         10 caractères/pouce, 6 lignes/pouce, ≈ {PAGE.linesPerPage} lignes par page,
-        soit <strong>1 page ≈ 1 minute d'écran</strong>. Marges : gauche {inToCm(PAGE.marginLeftIn)} cm
-        (reliure), droite {inToCm(PAGE.marginRightIn)} cm, haut et bas {inToCm(PAGE.marginTopIn)} cm.
+        soit <strong>1 page ≈ 1 minute d'écran</strong>. Marges : gauche et droite {inToCm(PAGE.marginLeftIn)} cm
+        (texte centré sur la page), haut et bas {inToCm(PAGE.marginTopIn)} cm.
         La référence complète est dans <code>docs/REGLES_FORMATAGE.md</code>.
       </p>
 

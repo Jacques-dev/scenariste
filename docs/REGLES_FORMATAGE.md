@@ -27,17 +27,22 @@ Mesurées depuis le bord du papier :
 
 | Marge | Valeur |
 |---|---|
-| Gauche | **1,5 po (3,8 cm)** — élargie pour la reliure (brads) |
-| Droite | 1 po (2,5 cm), non justifiée |
+| Gauche | **1,25 po (3,2 cm)** |
+| Droite | **1,25 po (3,2 cm)**, non justifiée |
 | Haut | 1 po (2,5 cm) avant la première ligne de texte |
 | Bas | 1 po (2,5 cm) minimum ; on ne descend jamais sous 0,5 po |
 | Numéro de page | à 0,5 po du haut, aligné sur la marge droite, suivi d'un point (`12.`) ; la page 1 n'est pas numérotée |
 
-La largeur utile du texte est donc de **6 po = 60 caractères** Courier.
+La largeur utile du texte est donc de **6 po = 60 caractères** Courier, centrée sur la page.
+
+> Le standard américain d'origine décale ce bloc vers la droite (1,5 po à gauche pour la
+> reliure à attaches, 1 po à droite). Scénariste centre le bloc : les scripts circulent
+> aujourd'hui surtout en PDF, sans reliure. La largeur utile, et donc la règle
+> 1 page ≈ 1 minute, est inchangée.
 
 ## 3. Les éléments et leurs retraits
 
-Les retraits ci-dessous sont mesurés **depuis la marge gauche du texte** (donc depuis 1,5 po
+Les retraits ci-dessous sont mesurés **depuis la marge gauche du texte** (donc depuis 1,25 po
 du bord), en caractères Courier (1 car. = 0,1 po).
 
 | Élément | Retrait | Largeur max | Casse |
@@ -189,7 +194,8 @@ Aucun numéro de page ; même police Courier 12 que le reste du script.
 
 ## 7. Ce que vérifie l'application (lint)
 
-Les règles marquées ⚡ proposent une **correction automatique** en un clic. Le bouton
+Cliquer sur une remarque sans correction mène à la ligne concernée, surlignée en bleu
+pendant 1,5 s. Les règles marquées ⚡ proposent une **correction automatique** en un clic. Le bouton
 « Tout corriger » les applique toutes, en plusieurs passes si une correction en révèle
 une autre — sauf les corrections marquées ⚡✋, qui engagent le sens du texte
 (renommage d'un personnage, transformation d'une didascalie en action) et se décident
@@ -199,7 +205,7 @@ donc au cas par cas.
 |---|---|---|
 | `scene-caps` ⚡ | Intitulé de séquence entièrement en majuscules | avertissement |
 | `scene-prefix` ⚡ | Point après le préfixe (`INT.`, pas `INT` ni `INT-`) | info |
-| `scene-time` | Présence du moment (JOUR/NUIT…) en fin d'intitulé | info |
+| `scene-time` | Présence du moment (JOUR/NUIT…) en fin d'intitulé — qualificatifs (`FIN DE NUIT`, `JOUR ET NUIT`) et précisions entre parenthèses (`- NUIT (PLUS TÔT)`) admis | info |
 | `scene-time-order` ⚡ | Moment mal placé (`INT. JOUR - LIEU`) — déplacé en fin d'intitulé | info |
 | `scene-sep` ⚡ | Moment séparé par un tiret (`- JOUR`) | info |
 | `scene-period` ⚡ | Pas de point final dans l'intitulé | info |
@@ -209,22 +215,26 @@ donc au cas par cas.
 | `char-near` ⚡✋ | Deux noms à une lettre d'écart — renommage partout en un clic | avertissement |
 | `char-paren` ⚡ | Indication de jeu sur la ligne du nom — passée sur sa propre ligne en didascalie | avertissement |
 | `char-blank` | Ligne seule en MAJUSCULES traitée comme action (réplique oubliée ?) | info |
+| `char-colon` ⚡ | Nom de personnage suivi de deux-points (`MARC :`), à la manière théâtrale | avertissement |
 | `char-intro` ⚡ | Première apparition d'un personnage dans l'action en MAJUSCULES | info |
 | `char-caps` ⚡✋ | Nom resté en MAJUSCULES dans l'action après sa présentation | info |
-| `paren-style` ⚡ | Didascalie en minuscules, sans point final | info |
+| `paren-inline` ⚡ | Didascalie et réplique sur la même ligne — séparées | avertissement |
+| `paren-style` ⚡ | Didascalie en minuscules (sauf nom de personnage), sans point final (points de suspension admis) | info |
 | `paren-close` ⚡ | Parenthèse refermée | avertissement |
 | `paren-ext` ⚡ | `(SUITE)`, `(OFF)`… seuls sous le nom — remontés sur la ligne du personnage | avertissement |
 | `paren-orphan` ⚡ | Didascalie hors d'un bloc de dialogue ; sous un intitulé, intégrée à l'intitulé | avertissement |
 | `dialogue-action` ⚡✋ | Action collée sous une réplique sans ligne vide (imprimée comme du dialogue) | avertissement |
 | `paren-end` ⚡✋ | Didascalie qui termine une réplique — transformation en action | avertissement |
-| `paren-long` | Didascalie de plus d'une ligne (devrait être de l'action) | info |
-| `dialogue-digits` ⚡ | Nombres convertis en toutes lettres (« 71 » → « soixante et onze ») | info |
-| `transition-colon` ⚡ | Transition terminée par `:` | info |
+| `paren-long` | Didascalie de plus de deux lignes (devrait être de l'action) | info |
+| `dialogue-digits` ⚡ | Nombres convertis en toutes lettres (« 71 » → « soixante et onze », « 30 000 € » → « trente mille euros ») ; heures `14h`, références `A4` et décimaux laissés tels quels | info |
+| `transition-colon` ⚡ | Transition terminée par `:` (`FADE OUT.`, `FONDU AU NOIR.` admis en dernière ligne) | info |
 | `action-we-see` | « nous voyons / on voit » implicite | info |
 | `action-camera` | Indications de caméra à éviter | info |
-| `action-long` | Paragraphe d'action > 6 lignes | info |
+| `action-long` | Paragraphe d'action > 6 lignes imprimées | info |
 | `dialogue-long` | Réplique > 12 lignes | info |
 | `double-space` ⚡ | Doubles espaces | info |
+| `emphasis` ⚡ | Gras / italique façon `**texte**` (interdits, §1) | info |
+| `title-empty` | Titre ou auteur vide sur la page de titre | info |
 
 Le formatage « dur » (retraits, largeurs, casse, pagination, `(SUITE)`) est appliqué
 automatiquement par l'éditeur et l'export : il n'a pas besoin d'être vérifié. L'éditeur

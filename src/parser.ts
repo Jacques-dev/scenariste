@@ -48,7 +48,8 @@ export function parseScript(source: string): ParsedLine[] {
     if (t.startsWith('.') && !t.startsWith('..')) { inDialogue = false; push('scene', t.slice(1).trim()); continue }
 
     // Intitulé de séquence.
-    if (REGEX.scene.test(t)) { inDialogue = false; push('scene'); continue }
+    // (Une ligne qui enchaîne intitulé et action après « : » reste de l'action.)
+    if (REGEX.scene.test(t) && !REGEX.sceneInline.test(t)) { inDialogue = false; push('scene'); continue }
 
     // Carton de fin : centré, même collé à la dernière réplique.
     if (REGEX.end.test(t)) { inDialogue = false; push('centered'); continue }

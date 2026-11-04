@@ -76,12 +76,17 @@ export const REGEX = {
   end: /^(FIN|THE END)\.?$/,
   /** Clé de bloc titre en tête de document : « Titre: … ». */
   titleKey: /^(titre|title|auteur(s)?|author(s)?|écrit par|written by|credit|crédit|contact|date|source|copyright|version|draft( date)?)\s*:/i,
-  /** Extension de personnage : (V.O.), (OFF), (SUITE)… */
-  charExtension: /\(([^)]*)\)\s*$/,
+  /** Extension(s) de personnage en fin de ligne : (V.O.), (OFF), (H.C.) (SUITE)… — le groupe capture la dernière. */
+  charExtension: /(?:\s*\(([^)]*)\))+\s*$/,
   /** Extensions reconnues sur la ligne du personnage ; tout le reste est une didascalie. */
   knownExtension: /^(V\.?\s?O\.?|VOIX OFF|O\.?\s?S\.?|O\.?\s?C\.?|OFF|H\.?\s?C\.?|HORS CHAMP|SUITE|CONT'D|CONT\.?|V\.?\s?F\.?|PRE-LAP|PRÉ-LAP|AU TÉLÉPHONE|TÉLÉPHONE|FILTRÉ|SUR L'ÉCRAN)$/i,
   /** Moment en fin d'intitulé. */
   sceneTime: new RegExp(`[-–—]\\s*(${SCENE_TIMES.join('|')})\\s*$`, 'i'),
+  /**
+   * Intitulé et action sur la même ligne (« 1. INT. CHAMBRE - NUIT : Arthur dort. »),
+   * typique d'un élément de montage : traité comme de l'action, pas comme un intitulé.
+   */
+  sceneInline: new RegExp(`(${SCENE_TIMES.join('|')})\\s*:\\s+\\S+(?:\\s+\\S+){2,}`, 'iu'),
 }
 
 /** Vrai si la ligne est entièrement en majuscules (accents compris) et contient des lettres. */

@@ -64,7 +64,9 @@ Structure : `INT./EXT. LIEU - MOMENT`
   `INT. HÔPITAL - COULOIR DES URGENCES - NUIT`.
 - Le **moment** termine l'intitulé : `JOUR`, `NUIT`, `AUBE`, `CRÉPUSCULE`, `MATIN`, `SOIR`,
   ou pour la continuité : `CONTINU`, `PLUS TARD`, `MÊME HEURE` (`DAY`, `NIGHT`,
-  `CONTINUOUS`, `LATER` en anglais).
+  `CONTINUOUS`, `LATER` en anglais). Il peut être qualifié (`FIN DE NUIT`, `JOUR ET NUIT`)
+  et suivi d'une précision entre parenthèses : `INT. HANGAR - JOUR (PRÉSENT)`,
+  `EXT. RUELLE - NUIT (QUELQUES HEURES PLUS TÔT)`.
 - Jamais de point final ; pas de mise en scène dans l'intitulé.
 - La numérotation des séquences dans les deux marges (`12 … 12`) est réservée aux
   **versions de tournage** (shooting script), pas aux versions de lecture.
@@ -202,13 +204,18 @@ donc au cas par cas.
 | `scene-sep` ⚡ | Moment séparé par un tiret (`- JOUR`) | info |
 | `scene-period` ⚡ | Pas de point final dans l'intitulé | info |
 | `scene-empty` | Séquence sans aucun contenu | avertissement |
+| `scene-inline` | Intitulé et action sur la même ligne (`1. INT. LIEU - NUIT : Arthur…`) — format de montage à revoir | info |
 | `char-variant` ⚡✋ | Même personnage orthographié différemment — renommage partout en un clic | avertissement |
 | `char-near` ⚡✋ | Deux noms à une lettre d'écart — renommage partout en un clic | avertissement |
 | `char-paren` ⚡ | Indication de jeu sur la ligne du nom — passée sur sa propre ligne en didascalie | avertissement |
 | `char-blank` | Ligne seule en MAJUSCULES traitée comme action (réplique oubliée ?) | info |
+| `char-intro` ⚡ | Première apparition d'un personnage dans l'action en MAJUSCULES | info |
+| `char-caps` ⚡✋ | Nom resté en MAJUSCULES dans l'action après sa présentation | info |
 | `paren-style` ⚡ | Didascalie en minuscules, sans point final | info |
 | `paren-close` ⚡ | Parenthèse refermée | avertissement |
-| `paren-orphan` | Didascalie hors d'un bloc de dialogue | avertissement |
+| `paren-ext` ⚡ | `(SUITE)`, `(OFF)`… seuls sous le nom — remontés sur la ligne du personnage | avertissement |
+| `paren-orphan` ⚡ | Didascalie hors d'un bloc de dialogue ; sous un intitulé, intégrée à l'intitulé | avertissement |
+| `dialogue-action` ⚡✋ | Action collée sous une réplique sans ligne vide (imprimée comme du dialogue) | avertissement |
 | `paren-end` ⚡✋ | Didascalie qui termine une réplique — transformation en action | avertissement |
 | `paren-long` | Didascalie de plus d'une ligne (devrait être de l'action) | info |
 | `dialogue-digits` ⚡ | Nombres convertis en toutes lettres (« 71 » → « soixante et onze ») | info |

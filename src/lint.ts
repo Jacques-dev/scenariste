@@ -11,6 +11,11 @@ export interface Fix {
   lines?: number[]
   /** true : correction à décider au cas par cas, exclue de « Tout corriger ». */
   manual?: boolean
+  /**
+   * Correction sur plusieurs lignes : `apply` reçoit les `span` lignes à partir de
+   * chaque ligne visée, jointes par « \n », et renvoie leur remplacement.
+   */
+  span?: number
 }
 
 export interface Issue {
@@ -31,6 +36,29 @@ const TIME_END = new RegExp(`\\s+(${SCENE_TIMES.join('|')})\\s*$`, 'i')
 const TIME_ANY = new RegExp(`(?<![\\p{L}])(${SCENE_TIMES.join('|')})(?![\\p{L}])`, 'iu')
 /** INT/EXT sans point ni slash derrière (espace ou tiret : « INT LIEU », « INT-NUIT-LIEU »). */
 const PREFIX_NO_DOT = /^(int|ext)(?=\s|[-–—])/i
+/** Précisions entre parenthèses en fin d'intitulé : « - NUIT (FLASHBACK) ». */
+const TRAILING_PARENS = /(?:\s*\([^)]*\))+\s*$/
+
+/** Sépare un intitulé en corps et précisions finales entre parenthèses. */
+function splitHeading(line: string): [string, string] {
+  const m = TRAILING_PARENS.exec(line)
+  return m ? [line.slice(0, m.index), m[0]] : [line, '']
+}
+
+/** Applique `fn` au corps de l'intitulé, en conservant les précisions finales. */
+const onBody = (fn: (body: string) => string) => (line: string) => {
+  const [body, tail] = splitHeading(line)
+  return fn(body) + tail
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+/** « ÉVA » → « Éva », « JEAN-PAUL » → « Jean-Paul ». */
+const titleCase = (s: string) =>
+  s.toLocaleLowerCase('fr-FR').replace(/(^|[-\s])(\p{L})/gu, (_m, a, b) => a + upper(b))
+/** Nom propre d'un seul mot (pas une fonction comme « L'INSPECTEUR » ou « LE CROUPIER »). */
+const PROPER_NAME = /^\p{L}[\p{L}-]*$/u
+/** Occurrence au sein d'un groupe en majuscules (« PARENTS D'ÉVA ») : à ignorer. */
+const IN_CAPS_GROUP = /\p{Lu}{2,}['’\s]+(?:D['’])?$/u
 
 /** Distance d'édition ≤ 1 entre deux noms (substitution, insertion ou suppression). */
 function near(a: string, b: string): boolean {
@@ -120,6 +148,18 @@ export function lint(parsed: ParsedLine[]): Issue[] {
   let dialogueRunStart = -1
   let lastDigitsLine = -10
 
+  // Noms des personnages qui parlent (forme normalisée), connus d'avance.
+  const cueNames = new Set<string>()
+  const cueDisplay = new Map<string, string>()
+  for (const p of parsed) {
+    if (p.type !== 'character') continue
+    const core = p.text.replace(REGEX.charExtension, '').trim()
+    if (core.length < 2) continue
+    const key = normName(core)
+    cueNames.add(key)
+    if (!cueDisplay.has(key)) cueDisplay.set(key, upper(core))
+  }
+
   // Noms de personnages : variantes regroupées par forme normalisée.
   const charGroups = new Map<string, Map<string, { count: number; firstLine: number; lines: number[] }>>()
 
@@ -170,21 +210,26 @@ export function lint(parsed: ParsedLine[]): Issue[] {
               label: 'Ajouter le point',
               apply: line => line.replace(/^(\s*)(int|ext)\s*[-–—]?\s*/i, (_m, a, b) => `${a}${upper(b)}. `),
             })
-        const hasDashTime = REGEX.sceneTime.test(p.text)
-        const hasEndTime = TIME_END.test(p.text)
+        // Le moment est cherché dans le dernier segment (après le dernier tiret), hors
+        // précisions entre parenthèses : « - NUIT (FLASHBACK) », « - FIN DE NUIT » et
+        // « - JOUR ET NUIT » sont valides ; « RADE DE NUIT - SOIR » a pour moment SOIR.
+        const [body] = splitHeading(p.text)
+        const lastDash = Math.max(body.lastIndexOf('-'), body.lastIndexOf('–'), body.lastIndexOf('—'))
+        const hasDashTime = lastDash >= 0 && TIME_ANY.test(body.slice(lastDash + 1))
+        const hasEndTime = TIME_END.test(body)
         if (!hasDashTime && hasEndTime)
           add(p.lineNo, 'scene-sep', 'info',
             'Séparez le moment par un tiret : « - JOUR ».', {
               label: 'Ajouter le tiret',
-              apply: line => line.replace(TIME_END, (_m, t) => ` - ${upper(t)}`),
+              apply: onBody(b => b.replace(TIME_END, (_m, t) => ` - ${upper(t)}`)),
             })
         if (!hasDashTime && !hasEndTime) {
-          const misplaced = TIME_ANY.exec(p.text)
+          const misplaced = TIME_ANY.exec(body)
           if (misplaced)
             add(p.lineNo, 'scene-time-order', 'info',
               `Le moment se place en fin d'intitulé : « INT. LIEU - ${upper(misplaced[1])} ».`, {
                 label: 'Déplacer à la fin',
-                apply: line => {
+                apply: onBody(line => {
                   const m = TIME_ANY.exec(line)
                   if (!m) return line
                   let rest = line.slice(0, m.index) + line.slice(m.index + m[0].length)
@@ -195,7 +240,7 @@ export function lint(parsed: ParsedLine[]): Issue[] {
                     .replace(/\s{2,}/g, ' ')
                     .trimEnd()
                   return `${rest} - ${upper(m[1])}`
-                },
+                }),
               })
           else
             add(p.lineNo, 'scene-time', 'info',
@@ -223,19 +268,40 @@ export function lint(parsed: ParsedLine[]): Issue[] {
           if (v) { v.count++; v.lines.push(p.lineNo) }
           else variants.set(core, { count: 1, firstLine: p.lineNo, lines: [p.lineNo] })
         }
-        const ext = REGEX.charExtension.exec(p.text)
-        if (core && ext && !REGEX.knownExtension.test(ext[1].trim()))
+        const exts = [...p.text.slice(core.length).matchAll(/\(([^)]*)\)/g)].map(m => m[1].trim())
+        if (core && exts.some(e => !REGEX.knownExtension.test(e)))
           add(p.lineNo, 'char-paren', 'warn',
             'Sur la ligne du nom, seules les extensions (V.O.), (OFF), (SUITE)… sont admises : ' +
             'une indication de jeu se place sur sa propre ligne, entre le nom et la réplique.', {
               label: 'Passer à la ligne',
-              apply: line => line.replace(/\s*\(([^)]*)\)\s*$/, (_m, inner: string) =>
-                `\n(${inner.trim().toLocaleLowerCase('fr-FR')})`),
+              apply: line => {
+                const m = REGEX.charExtension.exec(line)
+                if (!m) return line
+                const all = [...m[0].matchAll(/\(([^)]*)\)/g)].map(x => x[1].trim())
+                const keep = all.filter(e => REGEX.knownExtension.test(e)).map(e => ` (${e})`).join('')
+                const moved = all.filter(e => !REGEX.knownExtension.test(e))
+                  .map(e => `\n(${e.toLocaleLowerCase('fr-FR')})`).join('')
+                return line.slice(0, m.index) + keep + moved
+              },
             })
         break
       }
       case 'parenthetical': {
         const inner = p.text.replace(/^\(|\)$/g, '').trim()
+        // « (SUITE) », « (OFF) »… seuls sous le nom : ce sont des extensions du nom.
+        if (prev?.type === 'character' && /\)\s*$/.test(p.text) && REGEX.knownExtension.test(inner)) {
+          add(p.lineNo, 'paren-ext', 'warn',
+            `« (${inner}) » est une extension du nom, pas une didascalie : elle se place sur la ligne du personnage.`, {
+              label: 'Remonter sur la ligne du nom',
+              lines: [prev.lineNo],
+              span: 2,
+              apply: block => {
+                const [name, ext] = block.split('\n')
+                return `${name.trimEnd()} ${ext.trim()}`
+              },
+            })
+          break
+        }
         if (/^\p{Lu}/u.test(inner) || /[.]\)?\s*$/.test(p.text))
           add(p.lineNo, 'paren-style', 'info',
             'Didascalie en minuscules, sans point final : « (un temps) ».', {
@@ -267,6 +333,23 @@ export function lint(parsed: ParsedLine[]): Issue[] {
         break
       }
       case 'dialogue': {
+        // Action collée sous une réplique, sans ligne vide : « Arthur sourit, … ».
+        if (prev?.type === 'dialogue') {
+          const words = p.text.split(/\s+/)
+          for (let n = 1; n <= 3 && n < words.length; n++) {
+            const name = normName(words.slice(0, n).join(' '))
+            if (cueNames.has(name) && /^\p{Ll}/u.test(words[n])) {
+              add(p.lineNo, 'dialogue-action', 'warn',
+                'Cette ligne ressemble à de l\'action collée sous la réplique : ' +
+                'sans ligne vide avant, elle est imprimée comme du dialogue.', {
+                  label: 'Insérer une ligne vide avant',
+                  manual: true,
+                  apply: line => `\n${line}`,
+                })
+              break
+            }
+          }
+        }
         if (LONE_NUMBER.test(p.text) && p.lineNo > lastDigitsLine + 1) {
           add(p.lineNo, 'dialogue-digits', 'info',
             'Dans un dialogue, les nombres s\'écrivent en toutes lettres (« dix-sept », pas « 17 »).', {
@@ -288,9 +371,31 @@ export function lint(parsed: ParsedLine[]): Issue[] {
         break
       }
       case 'action': {
-        if (/^\(.*\)$/.test(p.text))
-          add(p.lineNo, 'paren-orphan', 'warn',
-            'Didascalie hors d\'un bloc de dialogue : placez-la sous un nom de personnage.')
+        if (/^\(.*\)$/.test(p.text)) {
+          let k = i - 1
+          while (k >= 0 && parsed[k].type === 'blank') k--
+          const heading = parsed[k]
+          if (heading?.type === 'scene')
+            add(p.lineNo, 'paren-orphan', 'warn',
+              'Précision isolée sous l\'intitulé : intégrez-la à l\'intitulé, après le moment ' +
+              '(« INT. BUREAU - JOUR (QUELQUES JOURS PLUS TARD) »).', {
+                label: 'Intégrer à l\'intitulé',
+                lines: [heading.lineNo],
+                span: p.lineNo - heading.lineNo + 1,
+                apply: block => {
+                  const parts = block.split('\n')
+                  return `${parts[0].trimEnd()} ${upper(parts[parts.length - 1].trim())}`
+                },
+              })
+          else
+            add(p.lineNo, 'paren-orphan', 'warn',
+              'Didascalie hors d\'un bloc de dialogue : placez-la sous un nom de personnage.')
+        }
+        if (REGEX.scene.test(p.text) && REGEX.sceneInline.test(p.text))
+          add(p.lineNo, 'scene-inline', 'info',
+            'Intitulé et action sur la même ligne. Pour un montage : une ligne « MONTAGE - … », ' +
+            'puis une entrée courte par plan (« Chambre d\'hôtel, nuit : Arthur… »), puis « FIN DU MONTAGE ». ' +
+            'Sinon, séparez l\'intitulé et l\'action.')
         if (/\b(nous voyons|on voit|we see)\b/i.test(p.text))
           add(p.lineNo, 'action-we-see', 'info',
             'Décrivez directement l\'image : « nous voyons / on voit » est implicite.')
@@ -310,6 +415,47 @@ export function lint(parsed: ParsedLine[]): Issue[] {
     }
   }
   flushRuns()
+
+  // Casse des noms dans l'action : MAJUSCULES à la première apparition, casse normale ensuite.
+  const actions = parsed.filter(p => p.type === 'action')
+  // Seuls les noms propres d'un mot sont suivis : « LE CROUPIER » peut désigner plusieurs figurants.
+  for (const name of cueDisplay.values()) {
+    if (!PROPER_NAME.test(name)) continue
+    const re = new RegExp(`(?<![\\p{L}])${escapeRe(name)}(?![\\p{L}])`, 'giu')
+    let intro: ParsedLine | undefined
+    const capsLines: number[] = []
+    for (const a of actions) {
+      for (const m of a.text.matchAll(re)) {
+        if (!intro) {
+          intro = a
+          if (m[0] !== upper(m[0]))
+            add(a.lineNo, 'char-intro', 'info',
+              `Première apparition de « ${m[0]} » dans l'action : son nom s'écrit en MAJUSCULES.`, {
+                label: 'Mettre en majuscules',
+                apply: line => line.replace(new RegExp(re.source, 'iu'), x => upper(x)),
+              })
+          break
+        }
+        if (a === intro) break
+        if (m[0] === name && !IN_CAPS_GROUP.test(a.text.slice(0, m.index))) {
+          capsLines.push(a.lineNo)
+          break
+        }
+      }
+    }
+    if (intro && capsLines.length > 0) {
+      const normal = titleCase(name)
+      add(capsLines[0], 'char-caps', 'info',
+        `Après sa présentation (l. ${intro.lineNo + 1}), « ${name} » s'écrit « ${normal} » dans l'action ` +
+        `(${capsLines.length} ligne${capsLines.length > 1 ? 's' : ''}).`, {
+          label: `Écrire « ${normal} » (${capsLines.length} lignes)`,
+          manual: true,
+          lines: capsLines,
+          apply: line => line.replace(new RegExp(`(?<![\\p{L}])${escapeRe(name)}(?![\\p{L}])`, 'gu'),
+            (x, idx: number) => IN_CAPS_GROUP.test(line.slice(0, idx)) ? x : normal),
+        })
+    }
+  }
 
   // Cohérence des noms de personnages.
   for (const variants of charGroups.values()) {

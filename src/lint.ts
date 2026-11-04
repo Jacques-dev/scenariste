@@ -129,6 +129,80 @@ function renameCue(main: string) {
     line.replace(/^(\s*@?\s*)(.*?)(\s*\([^)]*\))?\s*$/u, (_m, pre, _name, ext) => `${pre}${main}${ext ?? ''}`)
 }
 
+/* --- plans de montage --- */
+
+/** Préfixe d'un plan de montage écrit à la manière d'une liste : « MONTAGE - 1. », « 2) », « - ». */
+const MONTAGE_PREFIX = /^(?:(?:MONTAGE(?:\s+ALTERNÉ)?|SÉRIE DE PLANS)\s*[-–—:]\s*)?(?:\d+[.)]\s*)?(?:[-–—]\s+)?/iu
+/** Ligne d'ouverture d'un montage (sans intitulé collé). */
+const MONTAGE_HEADER = /^(?:MONTAGE|SÉRIE DE PLANS)\b/iu
+const MONTAGE_END = /^FIN (?:DU|DE LA) (?:MONTAGE|SÉRIE DE PLANS)\b/iu
+/** Plan de montage déjà au bon format : « - Lieu, moment : action ». */
+const MONTAGE_ITEM = /^[-–—]\s+[^:]+:\s+\S/u
+/** Intitulé collé à l'action : « INT. LIEU - MOMENT : action ». */
+const INLINE_HEADING = new RegExp(`^(.*?)\\s*[-–—]\\s*(${SCENE_TIMES.join('|')})\\s*:\\s+(.*)$`, 'iu')
+const HEADING_PREFIX =
+  /^(?:\d+[.)]?\s+)?(?:INT\.?\s*\/\s*EXT|EXT\.?\s*\/\s*INT|I\/E|INT(?:ÉRIEUR)?|EXT(?:ÉRIEUR)?)\.?\s*[-–—:/]?\s*/iu
+
+/** Corps d'un plan de montage « intitulé : action », préfixe de liste retiré ; null sinon. */
+function inlineEntryBody(text: string): string | null {
+  const body = text.slice(MONTAGE_PREFIX.exec(text)![0].length)
+  return REGEX.scene.test(body) && REGEX.sceneInline.test(body) ? body : null
+}
+
+const isMontageLine = (text: string) =>
+  inlineEntryBody(text) !== null || MONTAGE_ITEM.test(text) || MONTAGE_HEADER.test(text)
+
+const lower = (s: string) => s.toLocaleLowerCase('fr-FR')
+const capFirst = (s: string) => s.replace(/^\P{L}*\p{L}/u, c => upper(c))
+
+/**
+ * Noms propres connus du document : noms de personnages et mots écrits avec une
+ * seule majuscule initiale en milieu de phrase (« … regarde Félix entrer »).
+ */
+function properNames(parsed: ParsedLine[], cueNames: Set<string>): Set<string> {
+  const names = new Set(cueNames)
+  for (const p of parsed) {
+    if (p.type !== 'action' && p.type !== 'dialogue') continue
+    for (const m of p.text.matchAll(/(?<=[\p{L},;]\s+)\p{Lu}\p{Ll}+(?![\p{L}'’])/gu)) names.add(normName(m[0]))
+  }
+  return names
+}
+
+/**
+ * Texte d'action écrit presque entièrement en majuscules : remet les mots en
+ * MAJUSCULES en minuscules (sauf les noms propres connus, remis en « Félix ») et
+ * rétablit la majuscule en début de phrase.
+ */
+function unshout(s: string, names: Set<string>): string {
+  // Phrase par phrase : seules celles écrites surtout en majuscules sont reprises.
+  const sentences = s.match(/[^.!?…]+[.!?…]*\s*/gu) ?? [s]
+  const out = sentences.map(sentence => {
+    const letters = (sentence.match(/\p{L}/gu) ?? []).length
+    const capsWords = sentence.match(/[\p{L}'’-]+/gu)?.filter(w => w === upper(w) && /\p{L}/u.test(w)) ?? []
+    const capsLetters = capsWords.join('').replace(/\P{L}/gu, '').length
+    if (letters === 0 || capsLetters / letters < 0.5) return sentence
+    return sentence.replace(/[\p{L}'’-]+/gu, w =>
+      w !== upper(w) ? w : names.has(normName(w)) ? titleCase(w) : lower(w))
+  }).join('')
+  // Après « : », la phrase commence en minuscule ; ensuite, majuscule après . ! ? …
+  return out.replace(/([.!?…]\s+)(\p{Ll})/gu, (_m, a, b) => a + upper(b))
+}
+
+/** « INT. CHAMBRE D'HÔTEL - NUIT : action » → « - Chambre d'hôtel, nuit : action ». */
+function toMontageItem(body: string, names: Set<string>): string {
+  const m = INLINE_HEADING.exec(body)
+  if (!m) return body
+  const place = capFirst(lower(m[1].replace(HEADING_PREFIX, '').trim()))
+  return `- ${place}, ${lower(m[2])} : ${unshout(m[3].trim(), names)}`
+}
+
+function prevNonBlank(parsed: ParsedLine[], from: number): ParsedLine | undefined {
+  for (let i = from - 1; i >= 0; i--) {
+    if (parsed[i].type !== 'blank') return parsed[i]
+  }
+  return undefined
+}
+
 function nextNonBlank(parsed: ParsedLine[], from: number): ParsedLine | undefined {
   for (let i = from + 1; i < parsed.length; i++) {
     if (parsed[i].type !== 'blank') return parsed[i]
@@ -391,11 +465,32 @@ export function lint(parsed: ParsedLine[]): Issue[] {
             add(p.lineNo, 'paren-orphan', 'warn',
               'Didascalie hors d\'un bloc de dialogue : placez-la sous un nom de personnage.')
         }
-        if (REGEX.scene.test(p.text) && REGEX.sceneInline.test(p.text))
+        const entryBody = inlineEntryBody(p.text)
+        if (entryBody !== null) {
+          const listed = entryBody !== p.text
+          // Contexte du plan : ouverture du montage avant, plan suivant collé, fin du montage après.
+          const before = prevNonBlank(parsed, i)
+          const opened = before != null && (
+            isMontageLine(before.text) || (before.type === 'scene' && /MONTAGE|SÉRIE DE PLANS/i.test(before.text))
+          )
+          const after = nextNonBlank(parsed, i)
+          const glued = next != null && next.type !== 'blank'
+          const closed = after != null && (isMontageLine(after.text) || MONTAGE_END.test(after.text))
           add(p.lineNo, 'scene-inline', 'info',
-            'Intitulé et action sur la même ligne. Pour un montage : une ligne « MONTAGE - … », ' +
-            'puis une entrée courte par plan (« Chambre d\'hôtel, nuit : Arthur… »), puis « FIN DU MONTAGE ». ' +
-            'Sinon, séparez l\'intitulé et l\'action.')
+            (listed
+              ? 'Plan de montage écrit comme un intitulé complet. '
+              : 'Intitulé et action sur la même ligne. ') +
+            'Pour un montage : une ligne « MONTAGE », puis un plan court par paragraphe ' +
+            '(« - Chambre d\'hôtel, nuit : Arthur… », action en minuscules), puis « FIN DU MONTAGE ». ' +
+            (listed ? '' : 'Sinon, séparez l\'intitulé et l\'action.'), {
+              label: 'Réécrire en plan de montage',
+              manual: true,
+              apply: () =>
+                (opened ? '' : 'MONTAGE\n\n') +
+                toMontageItem(entryBody, properNames(parsed, cueNames)) +
+                (closed ? (glued ? '\n' : '') : '\n\nFIN DU MONTAGE' + (glued ? '\n' : '')),
+            })
+        }
         if (/\b(nous voyons|on voit|we see)\b/i.test(p.text))
           add(p.lineNo, 'action-we-see', 'info',
             'Décrivez directement l\'image : « nous voyons / on voit » est implicite.')
@@ -406,7 +501,8 @@ export function lint(parsed: ParsedLine[]): Issue[] {
         const nextBlank = !next || next.type === 'blank'
         const core = p.text.replace(REGEX.charExtension, '').trim()
         if (prevBlank && nextBlank && core.length > 0 && core.length <= 30 &&
-            isUpperLine(core) && !/[.!?…:]$/.test(core) && !REGEX.transitionWord.test(core))
+            isUpperLine(core) && !/[.!?…:]$/.test(core) && !REGEX.transitionWord.test(core) &&
+            !MONTAGE_HEADER.test(core) && !MONTAGE_END.test(core))
           add(p.lineNo, 'char-blank', 'info',
             'Ligne seule en MAJUSCULES traitée comme action. Réplique manquante dessous ? ' +
             '(forcez un personnage avec « @ », une action avec « ! »)')

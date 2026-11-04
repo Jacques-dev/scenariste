@@ -172,7 +172,13 @@ export function createEditor(
     },
     goToLine(lineNo: number) {
       const line = view.state.doc.line(Math.min(lineNo + 1, view.state.doc.lines))
-      view.dispatch({ selection: { anchor: line.from }, scrollIntoView: true })
+      // Place la ligne visée en haut de la zone visible (avec une petite marge).
+      // Près de la fin du script, le défilement est naturellement plafonné :
+      // la ligne reste alors là où le bas du document le permet.
+      view.dispatch({
+        selection: { anchor: line.from },
+        effects: EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 24 }),
+      })
       view.focus()
     },
     insertSnippet(snippet: string, selStart: number, selEnd: number) {

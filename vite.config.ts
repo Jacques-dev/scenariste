@@ -33,8 +33,8 @@ const injectCsp: Plugin = {
 }
 
 export default defineConfig({
-  // Servi sous /scenariste/ sur GitHub Pages, à la racine en local.
-  base: process.env.GITHUB_ACTIONS ? '/scenariste/' : '/',
+  // Servi à la racine de https://scenariste.jtellier.com (et en local).
+  base: '/',
   plugins: [react(), injectCsp],
   server: { port: 5173 },
 })

@@ -31,7 +31,7 @@ Supabase demande vos propres identifiants OAuth Google (gratuits) :
    (Authentication → Sign In / Up → Google), activez le fournisseur et enregistrez.
    Désactivez le fournisseur **Email** pour n'autoriser que Google.
 5. **Authentication → URL Configuration** : *Site URL* =
-   `https://jacques-dev.github.io/scenariste/` ; dans *Redirect URLs*, ajoutez
+   `https://scenariste.jtellier.com/` ; dans *Redirect URLs*, ajoutez
    `http://localhost:5173` (pour le développement local).
 
 La clé *anon public* est conçue pour être publiée dans le code du site : la sécurité

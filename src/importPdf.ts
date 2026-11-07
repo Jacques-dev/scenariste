@@ -99,10 +99,24 @@ export async function importPdf(data: ArrayBuffer): Promise<string> {
    * c'est exactement ce qui a forcé le retour à la ligne.
    */
   const wraps = (a: RawLine, b: RawLine): boolean => {
-    if (Math.abs(a.x - b.x) > 6) return false
-    const charW = (a.right - a.x) / Math.max(1, a.text.length)
+    const width = a.right - a.x
+    const charW = width / Math.max(1, a.text.length)
     const firstWord = b.text.split(' ')[0]
-    return a.right + charW * (1 + firstWord.length) > margin(a) - charW / 2
+    const needed = width + charW * (1 + firstWord.length)
+    // Texte aligné à gauche : la colonne s'arrête à la marge droite de ce retrait.
+    if (Math.abs(a.x - b.x) <= 6) return needed > margin(a) - a.x - charW / 2
+    // Texte centré (réplique centrée, par exemple) : les lignes partagent le
+    // même axe, et la colonne est aussi large que la plus longue d'entre elles.
+    if (Math.abs(center(a) - center(b)) <= 6) return needed > centeredWidth(center(a)) - charW / 2
+    return false
+  }
+  const center = (l: RawLine) => (l.x + l.right) / 2
+  const centeredWidth = (c: number): number => {
+    let m = 0
+    for (const o of flat) {
+      if (o.x > left + 6 && Math.abs(center(o) - c) <= 6 && o.right - o.x > m) m = o.right - o.x
+    }
+    return m
   }
 
   const out: string[] = []
@@ -123,7 +137,7 @@ export async function importPdf(data: ArrayBuffer): Promise<string> {
       if (/^(CONTINUED|SUITE)\s*:?\s*(\(\d+\))?$/i.test(t)) continue
 
       // Ligne vide dans l'original : écart vertical nettement supérieur à l'interligne.
-      const gapBefore = prevRaw != null && prevRaw.page === l.page && prevRaw.y - l.y > lineGap * 1.5
+      let gapBefore = prevRaw != null && prevRaw.page === l.page && prevRaw.y - l.y > lineGap * 1.5
 
       let g: Guess
       if (REGEX.scene.test(t)) g = 'scene'
@@ -139,9 +153,17 @@ export async function importPdf(data: ArrayBuffer): Promise<string> {
         // seulement si un nom vient d'être vu ; sinon action.
         g = 'action'
       }
-      // Réplique sans retrait (mise en page non standard) : ce qui suit un nom
-      // ou une didascalie sans ligne vide est encore la réplique.
-      if (g === 'action' && !gapBefore && (prev === 'character' || prev === 'parenthetical' || prev === 'dialogue')) {
+      // Un nom de personnage (ou sa didascalie) est toujours suivi de sa
+      // réplique, quels que soient le retrait (réplique centrée, à gauche…) et
+      // l'espace laissé entre les deux dans la mise en page d'origine.
+      // (Deux noms ne se suivent jamais : un « NON ! » centré est une réplique.)
+      if ((prev === 'character' || prev === 'parenthetical') && g !== 'scene' && g !== 'transition') {
+        g = t.startsWith('(') ? 'parenthetical' : 'dialogue'
+        gapBefore = false
+      }
+      // Suite d'une réplique sans retrait (mise en page non standard) : ce qui
+      // suit la réplique sans ligne vide en fait encore partie.
+      if (g === 'action' && !gapBefore && prev === 'dialogue') {
         g = t.startsWith('(') ? 'parenthetical' : 'dialogue'
       }
 

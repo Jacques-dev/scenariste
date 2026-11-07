@@ -65,7 +65,57 @@ export const LABELS = {
 export const SCENE_TIMES = [
   'JOUR', 'NUIT', 'AUBE', 'CRÉPUSCULE', 'MATIN', 'SOIR', 'CONTINU', 'PLUS TARD',
   'MÊME HEURE', 'DAY', 'NIGHT', 'DAWN', 'DUSK', 'MORNING', 'EVENING', 'CONTINUOUS', 'LATER',
+  'SAME',
 ]
+
+/**
+ * Moments hors usage → moment standard le plus proche. L'usage professionnel
+ * (Final Draft, guides de format) : JOUR ou NUIT par défaut ; AUBE, MATIN,
+ * SOIR, CRÉPUSCULE seulement si l'histoire l'exige ; CONTINU, PLUS TARD,
+ * MÊME HEURE pour la continuité. La nuance (« fin de journée », « 8 h ») a sa
+ * place dans l'action, pas dans l'intitulé, qui sert au plan de travail.
+ * Clés sans accents, en majuscules.
+ */
+const NONSTANDARD_TIMES: Record<string, string> = {
+  'JOURNEE': 'JOUR', 'EN JOURNEE': 'JOUR', 'MILIEU DE JOURNEE': 'JOUR', 'MIDI': 'JOUR',
+  'APRES-MIDI': 'JOUR', 'APRES MIDI': 'JOUR', 'DEBUT D\'APRES-MIDI': 'JOUR',
+  'DEBUT DE JOURNEE': 'MATIN', 'MATINEE': 'MATIN', 'DEBUT DE MATINEE': 'MATIN',
+  'FIN DE MATINEE': 'MATIN', 'TOT LE MATIN': 'MATIN',
+  'FIN DE JOURNEE': 'SOIR', 'FIN D\'APRES-MIDI': 'SOIR', 'FIN D\'APRES MIDI': 'SOIR',
+  'SOIREE': 'SOIR', 'DEBUT DE SOIREE': 'SOIR', 'DEBUT DE SOIR': 'SOIR',
+  'FIN DE SOIREE': 'NUIT', 'TARD LE SOIR': 'NUIT', 'MINUIT': 'NUIT', 'MILIEU DE LA NUIT': 'NUIT',
+  'FIN DE NUIT': 'AUBE', 'PETIT MATIN': 'AUBE', 'AURORE': 'AUBE', 'POINT DU JOUR': 'AUBE',
+  'LEVER DU JOUR': 'AUBE', 'LEVER DU SOLEIL': 'AUBE', 'PETIT JOUR': 'AUBE',
+  'COUCHER DU SOLEIL': 'CRÉPUSCULE', 'TOMBEE DE LA NUIT': 'CRÉPUSCULE',
+  'TOMBEE DU JOUR': 'CRÉPUSCULE', 'NUIT TOMBANTE': 'CRÉPUSCULE',
+  'ENTRE CHIEN ET LOUP': 'CRÉPUSCULE', 'BRUNANTE': 'CRÉPUSCULE',
+  'SUITE': 'CONTINU', 'EN CONTINU': 'CONTINU', 'CONTINUITE': 'CONTINU',
+  'PEU APRES': 'PLUS TARD', 'ENSUITE': 'PLUS TARD',
+  'MEME MOMENT': 'MÊME HEURE', 'AU MEME MOMENT': 'MÊME HEURE', 'SIMULTANEMENT': 'MÊME HEURE',
+  'AFTERNOON': 'DAY', 'NOON': 'DAY', 'MIDDAY': 'DAY', 'SUNRISE': 'DAWN', 'SUNSET': 'DUSK',
+  'TWILIGHT': 'DUSK', 'MIDNIGHT': 'NIGHT', 'LATE NIGHT': 'NIGHT', 'CONTINUED': 'CONTINUOUS',
+}
+
+/**
+ * Moment standard à proposer à la place de `segment` (fin d'intitulé après le
+ * dernier « - »), ou null s'il est déjà standard ou ne ressemble pas à un moment.
+ */
+export function suggestSceneTime(segment: string): string | null {
+  const up = segment.toLocaleUpperCase('fr-FR').replace(/\s+/g, ' ').replace(/[’]/g, '\'').trim()
+  if (SCENE_TIMES.includes(up)) return null
+  const key = up.normalize('NFD').replace(/\p{M}/gu, '')
+  if (NONSTANDARD_TIMES[key]) return NONSTANDARD_TIMES[key]
+  // Heure d'horloge (« 8H », « 14 H 30 », « 22:00 ») : jour ou nuit.
+  const clock = /^(\d{1,2})\s*(?:H|:)\s*(\d{2})?$/.exec(up)
+  if (clock) { const h = Number(clock[1]); return h >= 7 && h < 20 ? 'JOUR' : 'NUIT' }
+  // Moment standard noyé dans une tournure (« TARD DANS LA NUIT », « QUELQUES INSTANTS PLUS TARD »).
+  let best: { at: number; time: string } | null = null
+  for (const time of SCENE_TIMES) {
+    const m = new RegExp(`(?<![\\p{L}])${time}(?![\\p{L}])`, 'u').exec(up)
+    if (m && (!best || m.index < best.at)) best = { at: m.index, time }
+  }
+  return best?.time ?? null
+}
 
 export const REGEX = {
   /** Intitulé de séquence : INT./EXT./I/E/SÉQ, numéro de séquence optionnel devant. */

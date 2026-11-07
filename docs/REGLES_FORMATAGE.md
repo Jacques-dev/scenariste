@@ -62,7 +62,9 @@ Structure : `INT./EXT. LIEU - MOMENT`
   numéro : `SÉQ. 12 - INT. CUISINE - JOUR`.
 - Le **lieu** va du général au particulier, séparé par des tirets :
   `INT. HÔPITAL - COULOIR DES URGENCES - NUIT`.
-- Le **moment** termine l'intitulé : `JOUR`, `NUIT`, `AUBE`, `CRÉPUSCULE`, `MATIN`, `SOIR`,
+- Le **moment** termine l'intitulé : `JOUR` ou `NUIT` par défaut ; `AUBE`, `CRÉPUSCULE`,
+  `MATIN`, `SOIR` seulement si l'histoire l'exige (l'intitulé sert au plan de travail :
+  la nuance « fin de journée », « 8 h », « après-midi » va dans l'action) ;
   ou pour la continuité : `CONTINU`, `PLUS TARD`, `MÊME HEURE` (`DAY`, `NIGHT`,
   `CONTINUOUS`, `LATER` en anglais). Il peut être qualifié (`FIN DE NUIT`, `JOUR ET NUIT`)
   et suivi d'une précision entre parenthèses : `INT. HANGAR - JOUR (PRÉSENT)`,

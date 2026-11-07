@@ -1,5 +1,5 @@
 import { ParsedLine } from './parser'
-import { ELEMENTS, REGEX, SCENE_TIMES, isUpperLine } from './rules/spec'
+import { ELEMENTS, REGEX, SCENE_TIMES, isUpperLine, suggestSceneTime } from './rules/spec'
 
 export type Severity = 'warn' | 'info'
 
@@ -289,15 +289,34 @@ export function lint(parsed: ParsedLine[]): Issue[] {
               apply: line => line.replace(/^(\s*)(int|ext)\s*[-–—]?\s*/i, (_m, a, b) => `${a}${upper(b)}. `),
             })
         // Le moment est cherché dans le dernier segment (après le dernier tiret), hors
-        // précisions entre parenthèses : « - NUIT (FLASHBACK) », « - FIN DE NUIT » et
-        // « - JOUR ET NUIT » sont valides ; « RADE DE NUIT - SOIR » a pour moment SOIR.
+        // précisions entre parenthèses : « - NUIT (FLASHBACK) » est valide ;
+        // « RADE DE NUIT - SOIR » a pour moment SOIR.
         const [body] = splitHeading(p.text)
+        // Moment hors usage (« FIN DE JOURNÉE », « APRÈS-MIDI », « 8H ») : on
+        // propose le moment standard le plus proche.
+        const spaced = [...body.matchAll(/\s[-–—]\s+/g)].pop()
+        const segment = spaced ? body.slice(spaced.index! + spaced[0].length).trim() : ''
+        const standard = segment ? suggestSceneTime(segment) : null
+        if (standard) {
+          add(p.lineNo, 'scene-time-std', 'info',
+            `« ${upper(segment)} » n'est pas un moment d'intitulé usuel : préférez « ${standard} ». ` +
+            `Usage : JOUR ou NUIT ; AUBE, MATIN, SOIR, CRÉPUSCULE si l'histoire l'exige ; ` +
+            `CONTINU, PLUS TARD, MÊME HEURE pour la continuité. La nuance a sa place dans l'action.`, {
+              label: `Remplacer par ${standard}`,
+              manual: true,
+              apply: onBody(b => {
+                const m = [...b.matchAll(/\s[-–—]\s+/g)].pop()
+                if (!m) return b
+                return b.slice(0, m.index! + m[0].length) + standard + (/\s*$/.exec(b)?.[0] ?? '')
+              }),
+            })
+        }
         const lastDash = Math.max(body.lastIndexOf('-'), body.lastIndexOf('–'), body.lastIndexOf('—'))
-        const hasDashTime = lastDash >= 0 && TIME_ANY.test(body.slice(lastDash + 1))
+        const hasDashTime = standard != null || (lastDash >= 0 && TIME_ANY.test(body.slice(lastDash + 1)))
         const hasEndTime = TIME_END.test(body)
         if (!hasDashTime && hasEndTime)
           add(p.lineNo, 'scene-sep', 'info',
-            'Séparez le moment par un tiret : « - JOUR ».', {
+            `Séparez le moment par un tiret : « - ${upper(TIME_END.exec(body)![1])} ».`, {
               label: 'Ajouter le tiret',
               apply: onBody(b => b.replace(TIME_END, (_m, t) => ` - ${upper(t)}`)),
             })
@@ -322,7 +341,8 @@ export function lint(parsed: ParsedLine[]): Issue[] {
               })
           else
             add(p.lineNo, 'scene-time', 'info',
-              'Terminez l\'intitulé par le moment : « INT. MAISON DE CAMPAGNE - JOUR ».')
+              `Il manque le moment de la journée en fin d'intitulé, après un tiret : ` +
+              `« ${upper(body.trim())} - JOUR » (ou NUIT, SOIR, MATIN…).`)
         }
         if (/\.$/.test(p.text))
           add(p.lineNo, 'scene-period', 'info',

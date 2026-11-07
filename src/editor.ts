@@ -2,8 +2,8 @@ import {
   EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate, WidgetType, keymap,
   drawSelection, highlightActiveLine, placeholder, lineNumbers, highlightActiveLineGutter,
 } from '@codemirror/view'
-import { EditorState, RangeSetBuilder, StateField, Text } from '@codemirror/state'
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { EditorState, RangeSetBuilder, StateEffect, StateField, Text } from '@codemirror/state'
+import { defaultKeymap, history, historyKeymap, insertNewline } from '@codemirror/commands'
 import { parseScript } from './parser'
 import { ElType, REGEX } from './rules/spec'
 
@@ -261,22 +261,88 @@ const autoUppercase = EditorView.updateListener.of(u => {
 // forçage, comme le Tab de Final Draft (auto → .séquence → @personnage →
 // >transition → !action → auto).
 const SIGILS = ['', '.', '@', '>', '!']
+
+/**
+ * Découpe une ligne en marqueur de forçage + texte. Les espaces de tête sont
+ * ignorés (le parseur les ignore aussi), « ... » n'est pas un marqueur
+ * d'intitulé, et un texte centré « > FIN < » n'entre pas dans le cycle.
+ */
+function splitSigil(text: string): { sigil: string; rest: string; centered: boolean } {
+  const t = text.trimStart()
+  if (/^>.*<$/.test(t.trimEnd())) return { sigil: '', rest: t, centered: true }
+  const sigil = /^[@>!]/.test(t) || (t.startsWith('.') && !t.startsWith('..')) ? t[0] : ''
+  return { sigil, rest: t.slice(sigil.length), centered: false }
+}
+
+// Texte d'origine des lignes qu'on fait tourner : la mise en majuscules
+// automatique d'un intitulé ou d'un personnage ne doit pas être définitive si
+// l'on continue à tourner jusqu'à l'action. Oublié dès que l'auteur tape.
+interface CycleOrigin { from: number; text: string }
+const setCycleOrigins = StateEffect.define<CycleOrigin[]>()
+const cycleOrigins = StateField.define<CycleOrigin[]>({
+  create: () => [],
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setCycleOrigins)) return e.value
+    if (!tr.docChanged) return value
+    if (tr.isUserEvent('input') || tr.isUserEvent('delete') || tr.isUserEvent('undo') || tr.isUserEvent('redo')) return []
+    return value.map(o => ({ from: tr.changes.mapPos(o.from, -1), text: o.text }))
+  },
+})
+
 const cycleType = (dir: 1 | -1) => (view: EditorView): boolean => {
   const { state } = view
-  const line = state.doc.lineAt(state.selection.main.head)
-  const m = /^[.@>!]/.exec(line.text)
-  const cur = m ? SIGILS.indexOf(m[0]) : 0
-  const rest = m ? line.text.slice(1) : line.text
-  const next = SIGILS[(cur + dir + SIGILS.length) % SIGILS.length]
-  const head = state.selection.main.head
-  const delta = next.length - (m ? 1 : 0)
-  const anchor = Math.max(
-    line.from + next.length,
-    Math.min(head + delta, line.from + next.length + rest.length),
-  )
+  const { doc } = state
+  const sel = state.selection.main
+  const headLine = doc.lineAt(sel.head)
+  const headSplit = splitSigil(headLine.text)
+  const firstNo = doc.lineAt(sel.from).number
+  let lastNo = doc.lineAt(sel.to).number
+  // Sélection qui s'arrête au tout début d'une ligne : cette ligne n'en fait pas partie.
+  if (lastNo > firstNo && doc.line(lastNo).from === sel.to) lastNo--
+  const multi = lastNo > firstNo
+  if (!multi && headSplit.centered) return true
+
+  // Le type visé est décidé par la ligne du curseur (la première ligne d'une
+  // sélection), puis appliqué à toutes les lignes sélectionnées.
+  const ref = multi ? splitSigil(doc.line(firstNo).text) : headSplit
+  const cur = Math.max(0, SIGILS.indexOf(ref.sigil))
+  let next = SIGILS[(cur + dir + SIGILS.length) % SIGILS.length]
+  // « . » devant « ...texte » donnerait « .... », qui n'est pas un intitulé forcé :
+  // on saute cette étape du cycle.
+  if (next === '.' && ref.rest.startsWith('.')) {
+    next = SIGILS[(cur + 2 * dir + SIGILS.length) % SIGILS.length]
+  }
+
+  const { labels } = headerLocks(doc)
+  const origins = state.field(cycleOrigins)
+  const specs: { from: number; to: number; insert: string; rest: string; prefix: number }[] = []
+  for (let n = firstNo; n <= lastNo; n++) {
+    const line = doc.line(n)
+    if (multi && line.text.trim() === '') continue
+    if (labels.some(([a]) => a === line.from)) continue
+    const s = splitSigil(line.text)
+    if (s.centered || (next === '.' && s.rest.startsWith('.'))) continue
+    const known = origins.find(o => o.from === line.from)
+    const rest = known && known.text.toLocaleUpperCase('fr-FR') === s.rest.toLocaleUpperCase('fr-FR')
+      ? known.text
+      : s.rest
+    specs.push({ from: line.from, to: line.to, insert: next + rest, rest, prefix: line.text.length - s.rest.length })
+  }
+  if (specs.length === 0) return true
+
+  const changes = state.changes(specs.map(({ from, to, insert }) => ({ from, to, insert })))
+  let selection
+  if (multi) {
+    selection = { anchor: changes.mapPos(doc.line(firstNo).from, -1), head: changes.mapPos(doc.line(lastNo).to, 1) }
+  } else {
+    const s = specs[0]
+    const col = Math.max(0, sel.head - headLine.from - s.prefix)
+    selection = { anchor: changes.mapPos(headLine.from, -1) + next.length + Math.min(col, s.rest.length) }
+  }
   view.dispatch({
-    changes: { from: line.from, to: line.to, insert: next + rest },
-    selection: { anchor },
+    changes,
+    selection,
+    effects: setCycleOrigins.of(specs.map(s => ({ from: changes.mapPos(s.from, -1), text: s.rest }))),
   })
   return true
 }
@@ -327,7 +393,9 @@ export function createEditor(
         highlightActiveLineGutter(),
         highlightActiveLine(),
         keymap.of([
-          { key: 'Enter', run: moveInHeader(1) },
+          // Entrée ne recopie pas le retrait de la ligne précédente : un
+          // scénario n'a pas d'indentation saisie (les retraits sont calculés).
+          { key: 'Enter', run: v => moveInHeader(1)(v) || insertNewline(v) },
           // Sur le squelette, Tab navigue entre les champs ; ailleurs il fait
           // tourner le type de la ligne.
           {
@@ -350,6 +418,7 @@ export function createEditor(
         screenplayHighlight,
         headerGuard,
         headerField,
+        cycleOrigins,
         autoUppercase,
         EditorView.updateListener.of(u => {
           if (u.docChanged || u.selectionSet) {

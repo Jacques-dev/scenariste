@@ -5,7 +5,7 @@ import {
 import { EditorState, RangeSetBuilder, StateField, Text } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { parseScript } from './parser'
-import { ElType } from './rules/spec'
+import { ElType, REGEX } from './rules/spec'
 
 /** Texte fantôme affiché après une clé de bloc titre laissée vide. */
 class GhostWidget extends WidgetType {
@@ -209,6 +209,34 @@ const moveInHeader = (dir: 1 | -1) => (view: EditorView): boolean => {
 const autoUppercase = EditorView.updateListener.of(u => {
   if (!u.docChanged || u.view.composing) return
   const { state } = u.view
+
+  // Marqueur « . » devenu superflu : après un Tab sur une ligne vide, on tape
+  // « INT. CUISINE - JOUR » derrière le « . » — or l'intitulé est déjà reconnu
+  // tout seul, le point ne doit pas rester affiché. On ne retire que dans les
+  // lignes que l'auteur vient de saisir (le Tab lui-même ne déclenche rien, sinon
+  // il ne pourrait plus faire tourner le type d'un intitulé existant).
+  if (u.transactions.some(tr => tr.isUserEvent('input'))) {
+    const dots = new Map<number, { from: number; to: number; insert: string }>()
+    u.changes.iterChangedRanges((_a, _b, fromB, toB) => {
+      const last = state.doc.lineAt(Math.min(toB, state.doc.length)).number
+      for (let n = state.doc.lineAt(fromB).number; n <= last; n++) {
+        const line = state.doc.line(n)
+        if (!line.text.startsWith('.') || line.text.startsWith('..')) continue
+        const rest = line.text.slice(1).trim()
+        if (REGEX.scene.test(rest) && !REGEX.sceneInline.test(rest)) {
+          dots.set(n, { from: line.from, to: line.from + 1, insert: '' })
+        }
+      }
+    })
+    if (dots.size) {
+      const changes = [...dots.values()]
+      queueMicrotask(() => {
+        if (u.view.state.doc === state.doc) u.view.dispatch({ changes })
+      })
+      return // la mise en majuscules se refait sur le document corrigé
+    }
+  }
+
   const parsed = parseScript(state.doc.toString())
   const changes: { from: number; to: number; insert: string }[] = []
   for (const p of parsed) {

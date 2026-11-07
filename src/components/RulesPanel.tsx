@@ -56,7 +56,9 @@ export function RulesPanel() {
         <li><code>&gt;TRANSITION :</code> — force une transition</li>
         <li><code>&gt;texte centré&lt;</code> — centre le texte</li>
         <li><strong>Tab / Maj+Tab</strong> — fait tourner le type de la ligne courante
-          (auto → séquence → personnage → transition → action), comme dans Final Draft</li>
+          (auto → séquence → personnage → transition → action), comme dans Final Draft.
+          Sur les trois lignes de la page de titre, Tab passe au champ suivant
+          (Maj+Tab au précédent) ; après « Source: », il mène au corps du scénario</li>
       </ul>
 
       <h3>Page de titre</h3>

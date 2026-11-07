@@ -13,7 +13,8 @@ const STEPS: Step[] = [
     text: 'Écrivez ici : chaque ligne est reconnue et formatée automatiquement. '
       + '« INT. LIEU - JOUR » devient un intitulé de séquence, un NOM EN MAJUSCULES '
       + 'seul sur sa ligne lance un dialogue, « (un temps) » est une didascalie. '
-      + 'La touche Tab fait tourner le type de la ligne, comme dans Final Draft.',
+      + 'La touche Tab fait tourner le type de la ligne, comme dans Final Draft '
+      + '(sur la page de titre, elle passe simplement au champ suivant).',
   },
   {
     selector: '.insertbar',

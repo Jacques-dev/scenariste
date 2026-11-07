@@ -159,14 +159,29 @@ const headerField = StateField.define<DecorationSet>({
   ],
 })
 
-// Entrée dans le squelette : passe à la valeur suivante (puis au corps du
-// scénario après « Source: ») au lieu de casser la structure.
-const enterInHeader = (view: EditorView): boolean => {
-  const { state } = view
+/** Le curseur est-il sur une des lignes verrouillées du squelette ? */
+function inHeaderLine(state: EditorState): boolean {
   const { labels } = headerLocks(state.doc)
-  if (labels.length === 0) return false
   const line = state.doc.lineAt(state.selection.main.head)
-  if (line.number > HEADER_LINES || !labels.some(([a]) => a === line.from)) return false
+  return line.number <= HEADER_LINES && labels.some(([a]) => a === line.from)
+}
+
+// Entrée / Tab dans le squelette : passe à la valeur suivante (puis au corps du
+// scénario après « Source: »), Maj+Tab revient à la valeur précédente — au lieu
+// de casser la structure. Hors du squelette, ne fait rien (retourne false).
+const moveInHeader = (dir: 1 | -1) => (view: EditorView): boolean => {
+  const { state } = view
+  if (!inHeaderLine(state)) return false
+  const line = state.doc.lineAt(state.selection.main.head)
+  if (dir === -1) {
+    if (line.number > 1) {
+      view.dispatch({
+        selection: { anchor: state.doc.line(line.number - 1).to },
+        scrollIntoView: true,
+      })
+    }
+    return true
+  }
   if (line.number < HEADER_LINES) {
     view.dispatch({
       selection: { anchor: state.doc.line(line.number + 1).to },
@@ -284,8 +299,14 @@ export function createEditor(
         highlightActiveLineGutter(),
         highlightActiveLine(),
         keymap.of([
-          { key: 'Enter', run: enterInHeader },
-          { key: 'Tab', run: cycleType(1), shift: cycleType(-1) },
+          { key: 'Enter', run: moveInHeader(1) },
+          // Sur le squelette, Tab navigue entre les champs ; ailleurs il fait
+          // tourner le type de la ligne.
+          {
+            key: 'Tab',
+            run: v => moveInHeader(1)(v) || cycleType(1)(v),
+            shift: v => moveInHeader(-1)(v) || cycleType(-1)(v),
+          },
           ...defaultKeymap,
           ...historyKeymap,
         ]),
@@ -330,7 +351,11 @@ export function createEditor(
     },
     insertSnippet(snippet: string, selStart: number, selEnd: number) {
       const { state } = view
-      const line = state.doc.lineAt(state.selection.main.head)
+      // Curseur sur le squelette de titre : le gabarit s'insère après lui, sans
+      // couper la page de titre.
+      const line = inHeaderLine(state)
+        ? state.doc.line(Math.min(HEADER_LINES, state.doc.lines))
+        : state.doc.lineAt(state.selection.main.head)
       const lineEmpty = line.text.trim() === ''
       const prev = line.number > 1 ? state.doc.line(line.number - 1) : null
       const needBlank = lineEmpty ? (prev != null && prev.text.trim() !== '') : true

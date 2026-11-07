@@ -10,6 +10,7 @@ import { LintPanel } from './components/LintPanel'
 import { RulesPanel } from './components/RulesPanel'
 import { ScenariosDialog, useSession } from './components/Cloud'
 import { Guide } from './components/Guide'
+import { normalizeImport } from './importTitle'
 import { supabase, saveScenario, signInWithGoogle, ScenarioRow } from './supabase'
 
 type Mode = 'edit' | 'preview' | 'rules'
@@ -337,6 +338,8 @@ export default function App() {
       } else {
         text = await file.text()
       }
+      // Page de titre d'origine rangée dans le squelette (Titre / Écrit par / Source).
+      text = normalizeImport(text)
       const dirty = doc.trim() !== '' && doc.trim() !== NEW_DOC.trim() && doc !== lastSavedRef.current
       if (dirty && !(await askConfirm(`Remplacer le document actuel par « ${file.name} » reformaté ?`))) {
         setBusy(false)

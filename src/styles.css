@@ -135,6 +135,22 @@ button.ghost { background: none !important; }
 .cm-activeLineGutter { background: rgba(70, 120, 200, .12) !important; color: #555 !important; }
 .cm-placeholder { color: #999 !important; white-space: pre-wrap !important; }
 .cm-ghost { color: #a8a8a8; pointer-events: none; }
+/* Intitulés verrouillés du squelette de page de titre (« Titre: »…). */
+.cm-lock { color: #a0a0a0; cursor: default; }
+/* Suggestion facultative sous le squelette : discrète, simple lien. */
+.cm-suggest {
+  padding: 4px 0 0;
+  font: 12.5px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: #a0a0a0;
+}
+.cm-suggest button {
+  all: unset;
+  cursor: pointer;
+  color: #6b87b3;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.cm-suggest button:hover, .cm-suggest button:focus-visible { color: #3f68a8; text-decoration-style: solid; }
 
 /* Retraits des éléments — doivent refléter src/rules/spec.ts */
 .el-scene      { font-weight: 700; text-transform: uppercase; }

@@ -2,7 +2,7 @@ import {
   EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate, WidgetType, keymap,
   drawSelection, highlightActiveLine, placeholder, lineNumbers, highlightActiveLineGutter,
 } from '@codemirror/view'
-import { EditorState, RangeSetBuilder } from '@codemirror/state'
+import { EditorState, RangeSetBuilder, StateField, Text } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { parseScript } from './parser'
 import { ElType } from './rules/spec'
@@ -41,6 +41,150 @@ function buildDecorations(view: EditorView): DecorationSet {
     }
   }
   return builder.finish()
+}
+
+// ---------------------------------------------------------------------------
+// Squelette de page de titre verrouillé.
+//
+// Les trois premières lignes (« Titre: », « Écrit par: », « Source: ») sont une
+// structure, pas du texte libre : on ne peut écrire qu'après les deux-points, et
+// ni les intitulés ni les sauts de ligne qui les séparent ne sont modifiables à
+// la main. Seules les lignes qui portent réellement l'intitulé attendu sont
+// verrouillées : un texte importé qui n'a pas ce squelette reste entièrement libre.
+// ---------------------------------------------------------------------------
+const HEADER_LABELS = [/^Titre:[ ]?/, /^Écrit par:[ ]?/, /^Source:[ ]?/]
+const HEADER_LINES = HEADER_LABELS.length
+
+interface HeaderLocks {
+  /** Intitulés (« Titre: »…) : ni suppression ni insertion à l'intérieur ou avant. */
+  labels: [number, number][]
+  /** Sauts de ligne qui suivent chaque ligne verrouillée : non supprimables. */
+  breaks: [number, number][]
+  /** Les trois intitulés sont présents : le squelette est complet. */
+  full: boolean
+}
+
+function headerLocks(doc: Text): HeaderLocks {
+  const labels: [number, number][] = []
+  const breaks: [number, number][] = []
+  let full = true
+  for (let i = 0; i < HEADER_LINES; i++) {
+    if (i + 1 > doc.lines) { full = false; break }
+    const line = doc.line(i + 1)
+    const m = HEADER_LABELS[i].exec(line.text)
+    if (!m) { full = false; continue }
+    labels.push([line.from, line.from + m[0].length])
+    if (line.number < doc.lines) breaks.push([line.to, line.to + 1])
+  }
+  return { labels, breaks, full }
+}
+
+/** Rejette toute frappe, suppression, collage ou glisser qui toucherait au squelette. */
+const headerGuard = EditorState.changeFilter.of(tr => {
+  // Les modifications programmatiques (Nouveau, import, corrections, annuler) passent.
+  if (!tr.isUserEvent('input') && !tr.isUserEvent('delete')) return true
+  const { labels, breaks } = headerLocks(tr.startState.doc)
+  if (labels.length === 0) return true
+  const doc = tr.startState.doc
+  const headerEnd = doc.line(Math.min(HEADER_LINES, doc.lines)).to
+  let ok = true
+  tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+    const isDeletion = toA > fromA
+    for (const [a, b] of labels) {
+      if (isDeletion ? (fromA < b && toA > a) : (fromA >= a && fromA < b)) ok = false
+    }
+    for (const [a, b] of breaks) {
+      if (isDeletion && fromA < b && toA > a) ok = false
+    }
+    // Pas de saut de ligne dans une valeur de la page de titre.
+    if (fromA <= headerEnd && inserted.lines > 1) ok = false
+  })
+  return ok
+})
+
+/** Bouton facultatif sous le squelette : insère une séquence type pour démarrer. */
+function insertFirstScene(view: EditorView) {
+  const { doc } = view.state
+  const headerEnd = doc.line(Math.min(HEADER_LINES, doc.lines)).to
+  const at = headerEnd + 2 + 'INT. '.length
+  view.dispatch({
+    changes: { from: headerEnd, to: doc.length, insert: '\n\nINT. LIEU - JOUR' },
+    selection: { anchor: at, head: at + 'LIEU'.length },
+    scrollIntoView: true,
+  })
+  view.focus()
+}
+
+class FirstSceneWidget extends WidgetType {
+  eq() { return true }
+  toDOM(view: EditorView) {
+    const box = document.createElement('div')
+    box.className = 'cm-suggest'
+    box.append('Pas d’idée pour démarrer ? ')
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.textContent = 'Insérer une séquence type'
+    btn.title = 'Écrit « INT. LIEU - JOUR » : il ne reste qu’à remplacer LIEU. Facultatif — vous pouvez aussi écrire directement.'
+    btn.addEventListener('mousedown', e => e.preventDefault())
+    btn.addEventListener('click', () => insertFirstScene(view))
+    box.append(btn)
+    return box
+  }
+}
+
+function buildHeaderDecorations(doc: Text): DecorationSet {
+  const { labels, full } = headerLocks(doc)
+  const ranges = labels.map(([a, b]) => Decoration.mark({ class: 'cm-lock' }).range(a, b))
+  if (full) {
+    // Squelette complet et corps encore vide : on propose, discrètement, une première séquence.
+    let empty = true
+    for (let n = HEADER_LINES + 1; n <= doc.lines; n++) {
+      if (doc.line(n).text.trim() !== '') { empty = false; break }
+    }
+    if (empty) {
+      ranges.push(Decoration.widget({ widget: new FirstSceneWidget(), block: true, side: 1 }).range(doc.line(HEADER_LINES).to))
+    }
+  }
+  return Decoration.set(ranges, true)
+}
+
+const headerField = StateField.define<DecorationSet>({
+  create: state => buildHeaderDecorations(state.doc),
+  update: (value, tr) => (tr.docChanged ? buildHeaderDecorations(tr.newDoc) : value),
+  provide: f => [
+    EditorView.decorations.from(f),
+    // Le curseur saute par-dessus les intitulés au lieu d'y entrer.
+    EditorView.atomicRanges.of(view =>
+      view.state.field(f).update({ filter: (from, to) => to > from })),
+  ],
+})
+
+// Entrée dans le squelette : passe à la valeur suivante (puis au corps du
+// scénario après « Source: ») au lieu de casser la structure.
+const enterInHeader = (view: EditorView): boolean => {
+  const { state } = view
+  const { labels } = headerLocks(state.doc)
+  if (labels.length === 0) return false
+  const line = state.doc.lineAt(state.selection.main.head)
+  if (line.number > HEADER_LINES || !labels.some(([a]) => a === line.from)) return false
+  if (line.number < HEADER_LINES) {
+    view.dispatch({
+      selection: { anchor: state.doc.line(line.number + 1).to },
+      scrollIntoView: true,
+    })
+    return true
+  }
+  // Après la dernière ligne du squelette : une ligne vide, puis le corps.
+  const bodyLine = HEADER_LINES + 2
+  const missing = Math.max(0, bodyLine - state.doc.lines)
+  const changes = missing ? { from: state.doc.length, insert: '\n'.repeat(missing) } : undefined
+  const doc = changes ? state.update({ changes }).state.doc : state.doc
+  view.dispatch({
+    changes,
+    selection: { anchor: doc.line(bodyLine).to },
+    scrollIntoView: true,
+  })
+  return true
 }
 
 // Majuscules automatiques : les intitulés de séquence (et les personnages ou
@@ -140,6 +284,7 @@ export function createEditor(
         highlightActiveLineGutter(),
         highlightActiveLine(),
         keymap.of([
+          { key: 'Enter', run: enterInHeader },
           { key: 'Tab', run: cycleType(1), shift: cycleType(-1) },
           ...defaultKeymap,
           ...historyKeymap,
@@ -154,6 +299,8 @@ export function createEditor(
         }),
         placeholder('INT. LIEU - JOUR  …puis décrivez l\'action. Un NOM EN MAJUSCULES seul sur sa ligne ouvre un dialogue.'),
         screenplayHighlight,
+        headerGuard,
+        headerField,
         autoUppercase,
         EditorView.updateListener.of(u => {
           if (u.docChanged || u.selectionSet) {

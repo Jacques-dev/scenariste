@@ -364,10 +364,27 @@ export default function App() {
   }
 
   const baseName = () => {
-    const m = /^\s*titre?\s*:\s*(.+)$/im.exec(doc)
+    // [ \t]* et non \s* : un « Titre: » vide ne doit pas happer la ligne suivante.
+    const m = /^[ \t]*titre?[ \t]*:[ \t]*(.+)$/im.exec(doc)
     const t = m?.[1]?.trim()
     return (t && t.replace(/[^\p{L}\p{N} _-]/gu, '').trim()) || 'scenario'
   }
+
+  // Le navigateur propose le titre de la page comme nom du PDF imprimé :
+  // on lui donne le nom du scénario le temps de l'impression (bouton PDF ou Ctrl+P).
+  const baseNameRef = useRef(baseName)
+  baseNameRef.current = baseName
+  useEffect(() => {
+    const original = document.title
+    const onBefore = () => { document.title = baseNameRef.current() }
+    const onAfter = () => { document.title = original }
+    window.addEventListener('beforeprint', onBefore)
+    window.addEventListener('afterprint', onAfter)
+    return () => {
+      window.removeEventListener('beforeprint', onBefore)
+      window.removeEventListener('afterprint', onAfter)
+    }
+  }, [])
 
   return (
     <div className="app">
